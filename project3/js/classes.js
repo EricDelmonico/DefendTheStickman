@@ -25,6 +25,10 @@ class Vec2{
         return returnVal;
     }
 
+    floor(){
+        return new Vec2(Math.floor(this.x), Math.floor(this.y))
+    }
+
     normalize(){
         let len = Math.sqrt((this.x * this.x) + (this.y * this.y));
     }
@@ -36,45 +40,6 @@ const directions = {
     LEFT: new Vec2(-1, 0),
     RIGHT: new Vec2(1, 0)
 }
-
-// class Path{
-//     constructor(startPos = new Vec2(), direction = directions.DOWN, length = 100, pathWidth = 50){
-//         this.startPos = startPos;
-//         this.endPos = startPos.add(direction.multiply(length));
-//         this.direction = direction;
-//         this.pathWidth = pathWidth;
-//         this.length = length;
-//         this.renderer = this.createPath();
-//     }
-
-//     createPath(){
-//         // check direction
-//         let rend = new Rectangle();
-//         switch(this.direction){
-//             case directions.DOWN:
-//                 rend = new Rectangle(this.startPos, new Vec2(this.pathWidth, this.length), 0xAAAAAA, 0x888888);
-//                 return rend.renderer;
-//             case directions.UP:
-//                 rend = new Rectangle(this.startPos, new Vec2(this.pathWidth, -this.length), 0xAAAAAA, 0x888888);
-//                 return rend.renderer;
-//             case directions.LEFT:
-//                 rend = new Rectangle(this.startPos, new Vec2(-this.length, this.pathWidth), 0xAAAAAA, 0x888888);
-//                 return rend.renderer;
-//             case directions.RIGHT:
-//                 rend = new Rectangle(this.startPos, new Vec2(this.length, this.pathWidth), 0xAAAAAA, 0x888888);                
-//                 return rend.renderer;
-//             default:
-//                 return rend.renderer;
-//         }
-//     }
-
-//     updatePositions(positionAddition){
-//         this.renderer.x += positionAddition.x;
-//         this.renderer.y += positionAddition.y;
-//         this.startPos = new Vec2(this.renderer.position.x, this.renderer.position.y);
-//         this.endPos = this.startPos.add(this.direction.multiply(length));
-//     }
-// }
 
 class Level{
     // pass in all paths in the level
@@ -92,7 +57,7 @@ class Level{
 // enemy does not extend PIXI.Sprite
 // to maintain naming consistency
 class Enemy{
-    constructor(hp = 0, size = null, spriteURL = "images/placeholder.png"){
+    constructor(hp = 0, size = null, speed = 30, spriteURL = "images/placeholder.png"){
         this.renderer = new PIXI.Sprite(PIXI.loader.resources[spriteURL].texture);
         this.renderer.anchor.set(0, 0);// making sure pivot is consistent
         if (size == null){
@@ -106,11 +71,51 @@ class Enemy{
         this.bounds = new Bounds(this.position, new Vec2(this.renderer.width, this.renderer.height));
         this.alive = true;
         this.hp = hp;
+        this.pathIndex = 0;
+        this.speed = speed;
     }
 
-    update(){
+    update(dt){
         if (!this.alive)
             return;
+
+        let moving = this.pathIndex < paths.length;
+        // code to move the enemies
+        if(moving){
+            let path = paths[this.pathIndex];
+        let nextPath = false;
+        switch(path.dir){
+            case directions.UP:
+                if (this.position.y <= path.endPosition.y){
+                    nextPath = true;
+                }
+                break;
+            case directions.DOWN:
+                if (this.position.y >= path.endPosition.y){
+                    nextPath = true;
+                }
+                break;
+            case directions.LEFT:
+                if (this.position.x <= path.endPosition.x){
+                    nextPath = true;
+                }                
+                break;
+            case directions.RIGHT:
+                if (this.position.x >= path.endPosition.x){
+                    nextPath = true;
+                }
+                break;
+        }
+        if (nextPath){
+            this.pathIndex++;
+        }
+
+        if (dt != undefined && this.pathIndex < paths.length)
+            this.position = this.position.add(paths[this.pathIndex].dir.multiply(this.speed).multiply(dt));
+        }
+        else{
+            // damage the player
+        }
 
         this.renderer.position = this.position;
         this.bounds.position = this.position;
@@ -239,15 +244,17 @@ class Queue{
 // tile inherits from PIXI.Graphics for speed,
 // unlike Enemy and Rectangle
 class Tile extends PIXI.Graphics{
-    constructor(position = new Vec2(), size = new Vec2(40, 40)){
+    constructor(position = new Vec2(), size = new Vec2(40, 40), onclick = null){
         super();
         this.createRect(position, size, 0x999999);
-        this.mouseover.add(tint);
-        this.mouseout.add(untint);
+        this.bounds = new Bounds(position, size);
+        if (onclick != null){
+            this.onclick = onclick;
+        }
     }
 
     createRect(position, size, color){
-        let lineColor = color - 0x111111;
+        let lineColor = color - 0x222222;
 		this.beginFill(color);
 		this.lineStyle(1, lineColor, 1);
 		this.drawRect(0, 0, size.x, size.y);
@@ -256,11 +263,41 @@ class Tile extends PIXI.Graphics{
         this.y = position.y;
     }
 
-    tint(){
-        this.tint = 0xAAAAAA;
+    update(mousePos){
+        if (this.bounds.contains(mousePos)){
+            this.tintTile();
+            hoveredTile = this;
+        }
+        else{
+            this.untintTile()
+        }
     }
 
-    untint(){
+    tintTile(){
+        this.tint = 0xAAAAAA;
+    }
+    
+    untintTile(){
         this.tint = 0xFFFFFF;
+    }
+}
+
+class PathRenderer extends PIXI.Sprite{
+    constructor(position = new Vec2(), size = new Vec2(tileDimension, tileDimension)){
+        super(PIXI.loader.resources["images/dirtPath.png"].texture);
+        this.anchor.set(0, 0);// making sure pivot is consistent
+        this.width = size.x;
+        this.height = size.y;
+        this.x = position.x;
+        this.y = position.y;
+    }
+}
+
+class Path {
+    constructor(direction, length){
+        this.dir = direction;
+        this.len = length;
+        this.startPosition = new Vec2();
+        this.endPosition = new Vec2();
     }
 }

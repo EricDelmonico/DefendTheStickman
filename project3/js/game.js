@@ -1,15 +1,17 @@
 "use strict";
-let type = "WebGL"
+let type = "WebGL";
 if(!PIXI.utils.isWebGLSupported()){
-    type = "canvas"
+    type = "canvas";
 }
 let app = new PIXI.Application(600, 400);
-let tileDimension = 40;
+let tileDimension = 50;
 document.body.appendChild(app.view);
+let tilesWide = app.view.width / tileDimension;
+let tilesHigh = app.view.height / tileDimension;
 
 // load all images
 PIXI.Loader.shared.
-add(["images/placeholder.png"]).
+add(["images/placeholder.png", "images/dirtPath.png"]).
 on("progress",e=>{console.log(`progress=${e.progress}`)}).
 load(init);
 
@@ -24,7 +26,14 @@ let gameScene,
     FPSCounter,
     levels,
     levelPaths,
-    tiles;
+    tiles,
+    hoveredTile,
+    pastHoveredTile,
+    pathsMap,
+    pathCoords,
+    paths,
+    enemySpawnInterval = 3,
+    currentTime = 0;
 function init(){
     enemies = [];
     levels = [];
@@ -37,12 +46,46 @@ function init(){
     
     tiles = [];
     let tileSz = new Vec2(tileDimension, tileDimension);
-    for (let i = 0; i < app.view.width / tileDimension; i++){
-        for (let j = 0; j < app.view.height / tileDimension; j++){
-            let pos = new Vec2(i * tileDimension, j * tileDimension);
-            let newTile = new Tile(pos, tileSz);
-            gameScene.addChild(newTile);
-            tiles.push(newTile);
+    // Make paths manually
+    pathsMap = [];
+    {
+        for (let i = 0; i < tilesHigh; i++){
+            for (let j = 0; j < tilesWide; j++){
+                pathsMap[i * (tilesWide) + j] = 0;
+            }
+        }
+        pathCoords = [];
+        // create paths
+        paths = [];
+        paths.push(new Path(directions.UP, 5));
+        paths.push(new Path(directions.LEFT, 7));
+        paths.push(new Path(directions.UP, 3));        
+        let curPathCoords = new Vec2(13, 12);
+        for (let i = 0; i < paths.length; i++){
+            paths[i].startPosition.x = curPathCoords.x * tileDimension;
+            paths[i].startPosition.y = curPathCoords.y * tileDimension;            
+            curPathCoords = makePath(curPathCoords, paths[i]);
+            paths[i].endPosition.x = curPathCoords.x * tileDimension;
+            paths[i].endPosition.y = curPathCoords.y * tileDimension;  
+        }
+    }
+
+    // Make tiles and show sprites where paths are
+    {
+        for (let i = 0; i < tilesHigh; i++){
+            for (let j = 0; j < tilesWide; j++){
+                let pathHere = false;
+                pathCoords.forEach(path => pathHere = pathHere || (path.x == j && path.y == i));
+                if (pathHere){
+                    pathsRendering.addChild(new PathRenderer(new Vec2(j * tileDimension, i * tileDimension), 
+                                                             new Vec2(tileDimension, tileDimension)));
+                    continue;
+                }
+                let pos = new Vec2(j * tileDimension, i * tileDimension);
+                let newTile = new Tile(pos, tileSz);
+                gameScene.addChild(newTile);
+                tiles.push(newTile);
+            }
         }
     }
     
@@ -62,15 +105,19 @@ function init(){
     }
 
     // Create the first level
-    let level1Enemies = new Queue();
-    for (let i = 0; i < 10; i++){
-        let enemy = new Enemy(100);
-        enemy.position = new Vec2(i * 10, i * 10);
-        level1Enemies.enqueue(enemy);
+    let level1;
+    {
+        let level1Enemies = new Queue();
+        for (let i = 0; i < 10; i++){
+            let enemy = new Enemy(100, new Vec2(tileDimension, tileDimension));
+            enemy.position = new Vec2(pathCoords[0].x * tileDimension, 
+                                      pathCoords[0].y * tileDimension);
+            level1Enemies.enqueue(enemy);
+        }
+        level1 = new Level(level1Enemies);
+        enemies.push(level1.giveNextEnemy());
+        levels.push(level1);
     }
-    let level1 = new Level(level1Enemies);
-    enemies.push(level1.giveNextEnemy());
-    levels.push(level1);
     
     currentLevel = levels[0];
     // add containers in the order 
@@ -83,10 +130,43 @@ function init(){
     app.ticker.add(update);
 }
 
+function makePath(lastPathCoords, path){
+    let newLastPathCoords = lastPathCoords;
+    if (path.len <= 0){
+        return newLastPathCoords;
+    }
+    for (let i = 0; i < path.len; i++){
+        newLastPathCoords = newLastPathCoords.add(path.dir);
+        pathCoords.push(newLastPathCoords);
+    }
+    return newLastPathCoords;
+}
+
+let frame = 0;
 function update(){
+    // update tiles
+    for (let tile of tiles){
+        tile.update(getMousePosition());
+    }
+    if (hoveredTile != null){
+
+    }
+
+    // update enemies
+    {
+        for (let i = 0; i < enemies.length; i++){
+            enemies[i].update(1/app.ticker.FPS);
+        }
+        currentTime += 1 / app.ticker.FPS;
+        if (currentTime > enemySpawnInterval){
+            spawnNewEnemy();
+            currentTime = 0;
+        }
+    }
     FPSCounter.text = app.ticker.FPS;
     runMiscUpdateFunctions();
     resetOnscreenEnemies();
+    pastHoveredTile = hoveredTile;
 }
 
 function runMiscUpdateFunctions(){
@@ -106,7 +186,7 @@ function resetOnscreenEnemies(){
     }
 }
 
-function getNewEnemy(){
+function spawnNewEnemy(){
     let newEnemy = currentLevel.giveNextEnemy();
     // don't push null to the stage
     if (newEnemy != null)
