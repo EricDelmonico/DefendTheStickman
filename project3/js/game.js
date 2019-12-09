@@ -260,7 +260,7 @@ function spawnTower(){
     let towerHere = towers[stringFromCoords(hoveredTile.coords)] != null && 
                     towers[stringFromCoords(hoveredTile.coords)] != undefined;
     if (!towerHere){
-        let newTower = new Tower(10, 100, 1, hoveredTile.coords);
+        let newTower = new Tower(10, 3, 1, hoveredTile.coords);
         towers[stringFromCoords(newTower.coords)] = newTower;
         gameScene.addChild(newTower);
     }

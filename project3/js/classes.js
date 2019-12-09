@@ -43,7 +43,8 @@ class Vec2{
     }
 
     length(){
-        return Math.sqrt((this.x * this.x) + (this.y * this.y));
+        let lenSqrd = (this.x * this.x) + (this.y * this.y);
+        return Math.sqrt(lenSqrd);
     }
 }
 
@@ -365,41 +366,40 @@ class Tower extends PIXI.Sprite{
         if (this.timeSinceLastShot >= this.timeBetweenShots){
             this.timeSinceLastShot = 0;
             // for each enemy, get the closest
-            let dist = Number.MAX_VALUE;
             let vecToEnemy = new Vec2();
             for (let e of enemies){
                 let tempVec = this.centerPosition.vecFromThisToVec(e.position.add(enemySz.multiply(0.5)));
-                let tempDist = vecToEnemy.length();
-                if (tempDist < dist){
-                    dist = tempDist;
+                let tempDist = tempVec.length();
+                if (tempDist < this.range * tileDimension){
                     vecToEnemy = tempVec;
                     this.target = e;
+                    break;
                 }
             }
+            if (this.target == null){
+                return;
+            }
 
-            // if the enemy is within range, we're good to go
-            if ((dist / tileDimension) < this.range){
-                // cast a debug line to the target
-                if (this.line != null){
-                    app.stage.removeChild(this.line);
-                }
-                let endLine = this.centerPosition.add(vecToEnemy);
-                this.line = new Line(this.centerPosition, endLine);
-                app.stage.addChild(this.line);
-                
-                let unitVecToEnemy = vecToEnemy.normalize();
-                // point tower at enemy
-                this.rotation = Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x);
-                if (this.target != null && this.target != undefined){
-                    let proj = new Projectile(new Vec2(this.x, this.y), 
-                                              new Vec2(5, 5), 
-                                              500, 
-                                              Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x),
-                                              this.damage,
-                                              getKey());
-                    projectiles[proj.key] = proj;
-                    gameScene.addChild(proj);
-                }
+            // cast a debug line to the target
+            if (this.line != null){
+                app.stage.removeChild(this.line);
+            }
+            let endLine = this.centerPosition.add(vecToEnemy);
+            this.line = new Line(this.centerPosition, endLine);
+            app.stage.addChild(this.line);
+            
+            let unitVecToEnemy = vecToEnemy.normalize();
+            // point tower at enemy
+            this.rotation = Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x);
+            if (this.target != null && this.target != undefined){
+                let proj = new Projectile(new Vec2(this.x, this.y), 
+                                          new Vec2(5, 5), 
+                                          500, 
+                                          Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x),
+                                          this.damage,
+                                          getKey());
+                projectiles[proj.key] = proj;
+                gameScene.addChild(proj);
             }
         }
 
