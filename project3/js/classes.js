@@ -30,7 +30,7 @@ class Vec2{
     }
 
     normalize(){
-        let len = Math.sqrt((this.x * this.x) + (this.y * this.y));
+        let len = this.length();
         return new Vec2(this.x / len, this.y / len);
     }
 
@@ -40,6 +40,10 @@ class Vec2{
 
     vecFromThisToVec(vec2){
         return vec2.subtract(this);
+    }
+
+    length(){
+        return Math.sqrt((this.x * this.x) + (this.y * this.y));
     }
 }
 
@@ -82,45 +86,46 @@ class Enemy{
         this.hp = hp;
         this.pathIndex = 0;
         this.speed = speed;
+        this.moving = false;
     }
 
     update(dt){
         if (!this.alive)
             return;
 
-        let moving = this.pathIndex < paths.length;
+        this.moving = this.pathIndex < paths.length;
         // code to move the enemies
-        if(moving){
+        if(this.moving){
             let path = paths[this.pathIndex];
-        let nextPath = false;
-        switch(path.dir){
-            case directions.UP:
-                if (this.position.y <= path.endPosition.y){
-                    nextPath = true;
-                }
-                break;
-            case directions.DOWN:
-                if (this.position.y >= path.endPosition.y){
-                    nextPath = true;
-                }
-                break;
-            case directions.LEFT:
-                if (this.position.x <= path.endPosition.x){
-                    nextPath = true;
-                }                
-                break;
-            case directions.RIGHT:
-                if (this.position.x >= path.endPosition.x){
-                    nextPath = true;
-                }
-                break;
-        }
-        if (nextPath){
-            this.pathIndex++;
-        }
+            let nextPath = false;
+            switch(path.dir){
+                case directions.UP:
+                    if (this.position.y <= path.endPosition.y){
+                        nextPath = true;
+                    }
+                    break;
+                case directions.DOWN:
+                    if (this.position.y >= path.endPosition.y){
+                        nextPath = true;
+                    }
+                    break;
+                case directions.LEFT:
+                    if (this.position.x <= path.endPosition.x){
+                        nextPath = true;
+                    }                
+                    break;
+                case directions.RIGHT:
+                    if (this.position.x >= path.endPosition.x){
+                        nextPath = true;
+                    }
+                    break;
+            }
+            if (nextPath){
+                this.pathIndex++;
+            }
 
-        if (dt != undefined && this.pathIndex < paths.length)
-            this.position = this.position.add(paths[this.pathIndex].dir.multiply(this.speed).multiply(dt));
+            if (dt != undefined && this.pathIndex < paths.length)
+                this.position = this.position.add(paths[this.pathIndex].dir.multiply(this.speed).multiply(dt));
         }
         else{
             // damage the player
@@ -167,6 +172,30 @@ class Bounds{
         if (pos.y > this.max.y)
             return false;
 
+        return true;
+    }
+
+    intersects(b2)
+    {
+        if (b2 == null)
+            return false;
+
+        let b1 = this;
+
+        // is object 2 to the left of object 1?
+        if (b1.min.x > b2.max.x)
+            return false;
+        // Right?
+        if (b1.max.x < b2.min.x)
+            return false;
+        // Below?
+        if (b1.max.y < b2.min.y)
+            return false;
+        // Above?
+        if (b1.min.y > b2.max.y)
+            return false;
+
+        // inside?
         return true;
     }
 }
@@ -312,12 +341,12 @@ class Path {
 class Tower extends PIXI.Sprite{
     constructor(damage, range, rateOfFire, coords){
         super(getTexture("images/tower.png"));
-        this.anchor.set(0, 0);// making sure pivot is consistent
+        this.anchor.set(0.5, 0.5);// tower will rotate, pivot will be in center
         this.width = tileDimension;
         this.height = tileDimension;
-        this.x = tileDimension * coords.x;
-        this.y = tileDimension * coords.y;
-        this.centerPosition = new Vec2(this.x + this.width / 2, this.y + this.height / 2);
+        this.x = tileDimension * coords.x + this.width / 2;
+        this.y = tileDimension * coords.y + this.height / 2;
+        this.centerPosition = new Vec2(this.x, this.y);
         this.damage = damage;
         this.rateOfFire = rateOfFire;
         this.coords = coords;
@@ -335,25 +364,41 @@ class Tower extends PIXI.Sprite{
         this.timeSinceLastShot += dt;
         if (this.timeSinceLastShot >= this.timeBetweenShots){
             this.timeSinceLastShot = 0;
+            // for each enemy, get the closest
+            let dist = Number.MAX_VALUE;
+            let vecToEnemy = new Vec2();
             for (let e of enemies){
-                // for every enemy, cast a line 
-                // to the center of the enemy
-                let unitVecToEnemy = (this.centerPosition.vecFromThisToVec(e.position.add(enemySz.multiply(0.5)))).normalize();
-                for (let i = 0; i <= this.range; i += .01){
-                    // test if the enemy is on the line
-                    let testPos = this.centerPosition.add(unitVecToEnemy.multiply(i * tileDimension));
-                    if (e.bounds.contains(testPos)){
-                        if (this.line != null){
-                            app.stage.removeChild(this.line);
-                        }
-                        this.line = new Line(this.centerPosition, testPos);
-                        app.stage.addChild(this.line);
-                        this.target = e;
-                        break;
-                    }
+                let tempVec = this.centerPosition.vecFromThisToVec(e.position.add(enemySz.multiply(0.5)));
+                let tempDist = vecToEnemy.length();
+                if (tempDist < dist){
+                    dist = tempDist;
+                    vecToEnemy = tempVec;
+                    this.target = e;
                 }
-                if (this.target != null){
-                    break;
+            }
+
+            // if the enemy is within range, we're good to go
+            if ((dist / tileDimension) < this.range){
+                // cast a debug line to the target
+                if (this.line != null){
+                    app.stage.removeChild(this.line);
+                }
+                let endLine = this.centerPosition.add(vecToEnemy);
+                this.line = new Line(this.centerPosition, endLine);
+                app.stage.addChild(this.line);
+                
+                let unitVecToEnemy = vecToEnemy.normalize();
+                // point tower at enemy
+                this.rotation = Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x);
+                if (this.target != null && this.target != undefined){
+                    let proj = new Projectile(new Vec2(this.x, this.y), 
+                                              new Vec2(5, 5), 
+                                              500, 
+                                              Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x),
+                                              this.damage,
+                                              getKey());
+                    projectiles[proj.key] = proj;
+                    gameScene.addChild(proj);
                 }
             }
         }
@@ -363,36 +408,43 @@ class Tower extends PIXI.Sprite{
 }
 
 class Projectile extends PIXI.Sprite{
-    constructor(position, size, speed, rotation, key){
+    constructor(position, size, speed, rotation, damage, key){
         super(getTexture());
-        this.bounds = new Bounds(position, size);
-        this.anchor.set(0, 0);// making sure pivot is consistent
+        this.anchor.set(0.5, 0.5);// making sure pivot is consistent
         this.width = size.x;
         this.height = size.y;
         this.x = position.x;
         this.y = position.y;
         this.position1 = position;
-        this.centerPosition = this.position1.add(new Vec2(tileDimension / 2, tileDimension / 2))
+        this.bounds = new Bounds(this.position1, size);
         this.rotation = rotation;
         let dir = new Vec2(Math.cos(rotation), Math.sin(rotation));
         this.velocity = dir.multiply(speed);
         this.key = key;
+        this.tint = 0x444444;
+        this.damage = damage;
     }
 
-    update(){
-        if (levelBounds.contains(this.centerPosition)){
-            
+    update(dt){
+        if (levelBounds.intersects(this.bounds)){
+            this.position1 = this.position1.add(this.velocity.multiply(dt));  
         }
         else{
-            gameScene.removeChild(this);
-            delete projectiles[key];
-            // is this allowed?
-            delete this;
+            this.deleteProj();
         }
 
         this.position = this.position1;
-        this.bounds.position = this.position;
+        this.bounds.position = this.position1;
         this.bounds.update();
+    }
+
+    deleteProj(){
+        gameScene.removeChild(this);
+        delete projectiles[this.key];
+        currentKey = "";
+        currentKeyIndex = 0;
+        // does this work?
+        delete this;
     }
 }
 

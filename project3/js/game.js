@@ -18,7 +18,7 @@ load(init);
 let levelBounds = new Bounds(new Vec2(0, 0), 
                              new Vec2(app.view.width, app.view.height));
 
-let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
+let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 let gameScene, 
     background,
     enemies,
@@ -39,7 +39,8 @@ let gameScene,
     enemySpawnInterval = 3,
     currentTime = 0,
     projectiles,
-    currentKey;
+    currentKey = "",
+    currentKeyIndex = 0;
 function init(){
     enemies = [];
     levels = [];
@@ -182,6 +183,14 @@ function update(){
         }
     }
 
+    // update projectiles
+    {
+        for (let key in projectiles){
+            projectiles[key].update(dt);
+        }
+    }
+    doProjectileEnemyCollisions();
+
     FPSCounter.text = app.ticker.FPS;
     runMiscUpdateFunctions();
     resetOnscreenEnemies();
@@ -220,6 +229,9 @@ function onclick(){
     if (hoveredTile != undefined && hoveredTile.onclick != null){
         hoveredTile.onclick();
     }
+    for (let enemy of enemies){
+        console.log(enemy.hp);
+    }
 }
 
 function getRandomDirection(){
@@ -251,7 +263,7 @@ function spawnTower(){
     let towerHere = towers[stringFromCoords(hoveredTile.coords)] != null && 
                     towers[stringFromCoords(hoveredTile.coords)] != undefined;
     if (!towerHere){
-        let newTower = new Tower(10, 5, 1, hoveredTile.coords);
+        let newTower = new Tower(10, 100, 5, hoveredTile.coords);
         towers[stringFromCoords(newTower.coords)] = newTower;
         gameScene.addChild(newTower);
     }
@@ -262,5 +274,68 @@ function stringFromCoords(vec){
 }
 
 function getKey(){
+    let projAmnt = 0;
+    for (let key in projectiles){
+        projAmnt++;
+    }
+    if (projAmnt == 0){
+        currentKey = "";
+        currentKeyIndex = 0;
+    }
+
+    let skipProcess = false;
+    if (currentKey.length < 100){
+        currentKey += alphabet[currentKeyIndex];
+        skipProcess = true;
+    }
+
+    if (!skipProcess){
+        let currentLetterToIndex = -1;
+        for (let i = 0; i < currentKey.length; i++){
+            if (currentKey[i] == alphabet[currentKeyIndex]){
+                currentLetterToIndex++;
+            }
+        }
+        if (currentLetterToIndex == -1){
+            if (currentKeyIndex < 24){
+                currentKeyIndex++;
+            }
+            else{
+                throw "Too many projectiles on screen. Current Amount: " + projAmnt;
+            }
+        }
+        else{
+            currentKey = replaceLetterInStr(currentKey, currentLetterToIndex, alphabet[currentKeyIndex + 1]);
+        }
+    }
     
+    // if there's a projectile here, try again
+    if (projectiles[currentKey] != null &&
+        projectiles[currentKey] != undefined){       
+            return getKey();
+    }
+    return currentKey;
+}
+
+function replaceLetterInStr(string, index, letter){
+    let finalString = "";
+    finalString += string.slice(0, index);
+    finalString += letter;
+    finalString += string.slice(index + 1);
+    return finalString;
+}
+
+function doProjectileEnemyCollisions(){
+    for (let key in projectiles){
+        for (let enemy of enemies){
+            let proj = projectiles[key];
+            if (proj.bounds.intersects(enemy.bounds)){
+                enemy.doDamage(proj.damage);
+                proj.deleteProj();
+                // this projectile is now
+                // deleted, must exit enemy loop
+                break;
+            }
+        }
+    }
 }
