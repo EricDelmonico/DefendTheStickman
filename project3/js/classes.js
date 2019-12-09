@@ -31,6 +31,15 @@ class Vec2{
 
     normalize(){
         let len = Math.sqrt((this.x * this.x) + (this.y * this.y));
+        return new Vec2(this.x / len, this.y / len);
+    }
+
+    equals(vec2){
+        return (vec2.x == this.x && vec2.y == this.y);
+    }
+
+    vecFromThisToVec(vec2){
+        return vec2.subtract(this);
     }
 }
 
@@ -58,7 +67,7 @@ class Level{
 // to maintain naming consistency
 class Enemy{
     constructor(hp = 0, size = null, speed = 30, spriteURL = "images/placeholder.png"){
-        this.renderer = new PIXI.Sprite(PIXI.loader.resources[spriteURL].texture);
+        this.renderer = new PIXI.Sprite(getTexture(spriteURL));
         this.renderer.anchor.set(0, 0);// making sure pivot is consistent
         if (size == null){
             this.renderer.scale.set(1);
@@ -243,24 +252,17 @@ class Queue{
 
 // tile inherits from PIXI.Graphics for speed,
 // unlike Enemy and Rectangle
-class Tile extends PIXI.Graphics{
+class Tile extends PIXI.Sprite{
     constructor(position = new Vec2(), size = new Vec2(40, 40), onclick = null){
-        super();
-        this.createRect(position, size, 0x999999);
+        super(getTexture());
         this.bounds = new Bounds(position, size);
-        if (onclick != null){
-            this.onclick = onclick;
-        }
-    }
-
-    createRect(position, size, color){
-        let lineColor = color - 0x222222;
-		this.beginFill(color);
-		this.lineStyle(1, lineColor, 1);
-		this.drawRect(0, 0, size.x, size.y);
-		this.endFill();
-		this.x = position.x;
+        this.anchor.set(0, 0);// making sure pivot is consistent
+        this.width = size.x;
+        this.height = size.y;
+        this.x = position.x;
         this.y = position.y;
+        this.coords = null;
+        this.onclick = onclick;
     }
 
     update(mousePos){
@@ -274,17 +276,22 @@ class Tile extends PIXI.Graphics{
     }
 
     tintTile(){
-        this.tint = 0xAAAAAA;
+        if (towers[stringFromCoords(this.coords)] != null && 
+            towers[stringFromCoords(this.coords)] != undefined){
+            this.tint = 0x0000FF; 
+            return;
+        }
+        this.tint = 0x00FF00;
     }
     
     untintTile(){
-        this.tint = 0xFFFFFF;
+        this.tint = 0xEEEEEE;
     }
 }
 
 class PathRenderer extends PIXI.Sprite{
     constructor(position = new Vec2(), size = new Vec2(tileDimension, tileDimension)){
-        super(PIXI.loader.resources["images/dirtPath.png"].texture);
+        super(getTexture("images/dirtPath.png"));
         this.anchor.set(0, 0);// making sure pivot is consistent
         this.width = size.x;
         this.height = size.y;
@@ -300,4 +307,104 @@ class Path {
         this.startPosition = new Vec2();
         this.endPosition = new Vec2();
     }
+}
+
+class Tower extends PIXI.Sprite{
+    constructor(damage, range, rateOfFire, coords){
+        super(getTexture("images/tower.png"));
+        this.anchor.set(0, 0);// making sure pivot is consistent
+        this.width = tileDimension;
+        this.height = tileDimension;
+        this.x = tileDimension * coords.x;
+        this.y = tileDimension * coords.y;
+        this.centerPosition = new Vec2(this.x + this.width / 2, this.y + this.height / 2);
+        this.damage = damage;
+        this.rateOfFire = rateOfFire;
+        this.coords = coords;
+        this.range = range;
+        this.line = null;
+        this.target = null;
+        this.timeSinceLastShot = 0;
+        this.timeBetweenShots = 1 / rateOfFire;
+    }
+
+    update(dt){
+        this.target = null;
+        let enemySz = new Vec2(tileDimension, tileDimension);
+        
+        this.timeSinceLastShot += dt;
+        if (this.timeSinceLastShot >= this.timeBetweenShots){
+            this.timeSinceLastShot = 0;
+            for (let e of enemies){
+                // for every enemy, cast a line 
+                // to the center of the enemy
+                let unitVecToEnemy = (this.centerPosition.vecFromThisToVec(e.position.add(enemySz.multiply(0.5)))).normalize();
+                for (let i = 0; i <= this.range; i += .01){
+                    // test if the enemy is on the line
+                    let testPos = this.centerPosition.add(unitVecToEnemy.multiply(i * tileDimension));
+                    if (e.bounds.contains(testPos)){
+                        if (this.line != null){
+                            app.stage.removeChild(this.line);
+                        }
+                        this.line = new Line(this.centerPosition, testPos);
+                        app.stage.addChild(this.line);
+                        this.target = e;
+                        break;
+                    }
+                }
+                if (this.target != null){
+                    break;
+                }
+            }
+        }
+
+        
+    }
+}
+
+class Projectile extends PIXI.Sprite{
+    constructor(position, size, speed, rotation, key){
+        super(getTexture());
+        this.bounds = new Bounds(position, size);
+        this.anchor.set(0, 0);// making sure pivot is consistent
+        this.width = size.x;
+        this.height = size.y;
+        this.x = position.x;
+        this.y = position.y;
+        this.position1 = position;
+        this.centerPosition = this.position1.add(new Vec2(tileDimension / 2, tileDimension / 2))
+        this.rotation = rotation;
+        let dir = new Vec2(Math.cos(rotation), Math.sin(rotation));
+        this.velocity = dir.multiply(speed);
+        this.key = key;
+    }
+
+    update(){
+        if (levelBounds.contains(this.centerPosition)){
+            
+        }
+        else{
+            gameScene.removeChild(this);
+            delete projectiles[key];
+            // is this allowed?
+            delete this;
+        }
+
+        this.position = this.position1;
+        this.bounds.position = this.position;
+        this.bounds.update();
+    }
+}
+
+class Line extends PIXI.Graphics{
+    constructor(startPos, endPos){
+        super();
+        this.lineStyle(1, 0x00FFFF, 0.9);
+        this.moveTo(startPos.x, startPos.y);
+        this.lineTo(endPos.x, endPos.y);
+    }
+}
+
+function getTexture(spriteURL = "images/placeholder.png"){
+    return PIXI.loader.resources[spriteURL].texture;
 }

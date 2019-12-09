@@ -11,10 +11,14 @@ let tilesHigh = app.view.height / tileDimension;
 
 // load all images
 PIXI.Loader.shared.
-add(["images/placeholder.png", "images/dirtPath.png"]).
+add(["images/placeholder.png", "images/dirtPath.png", "images/tower.png"]).
 on("progress",e=>{console.log(`progress=${e.progress}`)}).
 load(init);
 
+let levelBounds = new Bounds(new Vec2(0, 0), 
+                             new Vec2(app.view.width, app.view.height));
+
+let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 let gameScene, 
     background,
     enemies,
@@ -28,16 +32,20 @@ let gameScene,
     levelPaths,
     tiles,
     hoveredTile,
-    pastHoveredTile,
+    towers,
     pathsMap,
     pathCoords,
     paths,
     enemySpawnInterval = 3,
-    currentTime = 0;
+    currentTime = 0,
+    projectiles,
+    currentKey;
 function init(){
     enemies = [];
     levels = [];
     levelPaths = [];
+    towers = new Object();
+    projectiles = new Object();
 
     gameScene = new PIXI.Container();
     background = new PIXI.Container();
@@ -83,6 +91,8 @@ function init(){
                 }
                 let pos = new Vec2(j * tileDimension, i * tileDimension);
                 let newTile = new Tile(pos, tileSz);
+                newTile.coords = new Vec2(j, i);
+                newTile.onclick = spawnTower;
                 gameScene.addChild(newTile);
                 tiles.push(newTile);
             }
@@ -128,6 +138,8 @@ function init(){
     app.stage.addChild(gameScene);
     gameScene.addChild(FPSCounter);
     app.ticker.add(update);
+
+    app.view.onclick = onclick;
 }
 
 function makePath(lastPathCoords, path){
@@ -148,25 +160,31 @@ function update(){
     for (let tile of tiles){
         tile.update(getMousePosition());
     }
-    if (hoveredTile != null){
-
-    }
+    let dt = 1/app.ticker.FPS;
+    if (dt > 1/12) dt = 1/12;
 
     // update enemies
     {
         for (let i = 0; i < enemies.length; i++){
-            enemies[i].update(1/app.ticker.FPS);
+            enemies[i].update(dt);
         }
-        currentTime += 1 / app.ticker.FPS;
+        currentTime += dt;
         if (currentTime > enemySpawnInterval){
             spawnNewEnemy();
             currentTime = 0;
         }
     }
+
+    //update towers
+    {
+        for (let key in towers){
+            towers[key].update(dt);
+        }
+    }
+
     FPSCounter.text = app.ticker.FPS;
     runMiscUpdateFunctions();
     resetOnscreenEnemies();
-    pastHoveredTile = hoveredTile;
 }
 
 function runMiscUpdateFunctions(){
@@ -198,6 +216,12 @@ function getMousePosition(){
     return new Vec2(pos.x, pos.y);
 }
 
+function onclick(){
+    if (hoveredTile != undefined && hoveredTile.onclick != null){
+        hoveredTile.onclick();
+    }
+}
+
 function getRandomDirection(){
     let rng = Math.floor(Math.random() * 4);
     let newDirection;
@@ -219,4 +243,24 @@ function getRandomDirection(){
             break
     }
     return newDirection;
+}
+
+// click functions
+function spawnTower(){
+    // make sure there's no tower here
+    let towerHere = towers[stringFromCoords(hoveredTile.coords)] != null && 
+                    towers[stringFromCoords(hoveredTile.coords)] != undefined;
+    if (!towerHere){
+        let newTower = new Tower(10, 5, 1, hoveredTile.coords);
+        towers[stringFromCoords(newTower.coords)] = newTower;
+        gameScene.addChild(newTower);
+    }
+}
+
+function stringFromCoords(vec){
+    return `${vec.x},${vec.y}`;
+}
+
+function getKey(){
+    
 }
