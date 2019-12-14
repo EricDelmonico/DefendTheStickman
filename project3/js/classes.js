@@ -66,8 +66,6 @@ class Level{
     }
 }
 
-// enemy does not extend PIXI.Sprite
-// to maintain naming consistency
 class Enemy{
     constructor(hp = 0, size = null, speed = 30, spriteURL = "images/placeholder.png"){
         this.renderer = new PIXI.Sprite(getTexture(spriteURL));
@@ -88,12 +86,14 @@ class Enemy{
         this.moving = true;
         this.reachedEnd = false;
         this.prevEnemy = null;
+
+        this.healthBar = new HealthBar(this.position, this.hp);
     }
 
     update(dt){
         if (!this.alive)
             return;
-
+        
         this.moving = this.pathIndex < paths.length;
         if (this.prevEnemy != null){
             if (!this.prevEnemy.alive){
@@ -145,6 +145,7 @@ class Enemy{
         this.renderer.position = this.position;
         this.bounds.position = this.position;
         this.bounds.update();
+        this.healthBar.update(this.position.add(new Vec2(this.bounds.size.x / 2, 0)), this.hp);
     }
 
     doDamage(damage){
@@ -211,35 +212,44 @@ class Bounds{
     }
 }
 
-// rectangle does not
-// extend PIXI.Graphics
-// so I can use my own
-// Vec2 functionality
-class Rectangle {
-    constructor(position = new Vec2(0, 0), size = new Vec2(10, 10), 
-                color = 0xFFFFFF, lineColor = color,
-                anchor = new Vec2(0, 0)){
-        this.renderer = new PIXI.Graphics();
-        // fields
-        this.bounds = new Bounds(position, size);
-        this.position = position;
+class HealthBar extends PIXI.Graphics{
+    constructor(position, initialHealth){
+        super();
+        this.initialHealth = initialHealth;
+        this.currentHealth = initialHealth;
         // Rendering the rect
-        this.createRect(position, size, color, lineColor, anchor);
+        this.size = new Vec2(initialHealth * 0.5, 10);
+        this.createRect(position);
     }
 
-    createRect(position, size, color, lineColor, anchor){
-		this.renderer.beginFill(color);
-		this.renderer.lineStyle(3, lineColor, 1);
-		this.renderer.drawRect(anchor.x, anchor.y, size.x, size.y);
-		this.renderer.endFill();
-		this.renderer.x = position.x;
-        this.renderer.y = position.y;
+    createRect(position){
+		this.beginFill(0xFF0000);
+		this.lineStyle(1, 0x000000, 1);
+		this.drawRect(-this.size.x / 2, -this.size.y / 2, this.size.x, this.size.y);
+        this.endFill();
+        this.beginFill(0x00FF00);
+		this.lineStyle(1, 0x000000, 1);
+        this.drawRect(-this.size.x / 2, -this.size.y / 2, 
+                      this.size.x * this.currentHealth / this.initialHealth, this.size.y * this.currentHealth / this.initialHealth);
+		this.endFill();
+		this.x = position.x;
+        this.y = position.y;
     }
 
-    update(){
-        this.renderer.position = this.position;
-        this.bounds.position = this.position;
-        this.bounds.update();
+    update(position, hp){
+        this.currentHealth = hp;
+        this.clear();
+        this.beginFill(0xFF0000);
+		this.lineStyle(1, 0x000000, 1);
+		this.drawRect(-this.size.x / 2, -this.size.y / 2, this.size.x, this.size.y);
+        this.endFill();
+        this.beginFill(0x00FF00);
+		this.lineStyle(1, 0x000000, 1);
+        this.drawRect(-this.size.x / 2, -this.size.y / 2, 
+                      this.size.x * this.currentHealth / this.initialHealth, this.size.y);
+		this.endFill();
+        this.x = position.x;
+        this.y = position.y;
     }
 
     intersects(rect)
@@ -467,15 +477,28 @@ class Line extends PIXI.Graphics{
     }
 }
 
-class Player{
+class Player extends PIXI.Sprite{
     constructor (position, hp, money){
+        super(getTexture("images/tower.png"));
+        this.anchor.set(0.5, 0.5);// tower will rotate, pivot will be in center
+        this.width = tileDimension;
+        this.height = tileDimension;
+        this.x = position.x;
+        this.y = position.y;
         this.position = position;
         this.hp = hp;
         this.money = money;
+        this.healthBar = new HealthBar(this.position, this.hp);
+    }
+
+    update(){
+        if (this.hp <= 0){
+            // game over
+        }
+
+        this.healthBar.update(this.position, this.hp);
     }
 }
-
-
 
 function getTexture(spriteURL = "images/placeholder.png"){
     return PIXI.loader.resources[spriteURL].texture;

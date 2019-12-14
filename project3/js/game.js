@@ -36,11 +36,14 @@ let gameScene,
     pathsMap,
     pathCoords,
     paths,
-    enemySpawnInterval = 3,
+    enemySpawnInterval = 3.5,
     currentTime = 0,
     projectiles,
     currentKey = "",
-    currentKeyIndex = 0;
+    currentKeyIndex = 0,
+    towersRendering,
+    tilesRendering,
+    healthBarsRendering;
 function init(){
     enemies = [];
     levels = [];
@@ -52,7 +55,10 @@ function init(){
     background = new PIXI.Container();
     enemiesRendering = new PIXI.Container();
     pathsRendering = new PIXI.Container();
-    
+    towersRendering = new PIXI.Container();
+    tilesRendering = new PIXI.Container();
+    healthBarsRendering = new PIXI.Container();
+
     tiles = [];
     let tileSz = new Vec2(tileDimension, tileDimension);
     // Make paths manually
@@ -94,13 +100,19 @@ function init(){
                 if (pathHere){
                     pathsRendering.addChild(new PathRenderer(new Vec2(j * tileDimension, i * tileDimension), 
                                                              new Vec2(tileDimension, tileDimension)));
+                    let pos = new Vec2(j * tileDimension, i * tileDimension);
+                    let newTile = new Tile(pos, tileSz);
+                    newTile.coords = new Vec2(j, i);
+                    newTile.onclick = null;
+                    tilesRendering.addChild(newTile);
+                    tiles.push(newTile);
                     continue;
                 }
                 let pos = new Vec2(j * tileDimension, i * tileDimension);
                 let newTile = new Tile(pos, tileSz);
                 newTile.coords = new Vec2(j, i);
                 newTile.onclick = spawnTower;
-                gameScene.addChild(newTile);
+                tilesRendering.addChild(newTile);
                 tiles.push(newTile);
             }
         }
@@ -126,10 +138,11 @@ function init(){
     {
         let level1Enemies = new Queue();
         for (let i = 0; i < 10; i++){
-            let enemy = new Enemy(100, new Vec2(tileDimension, tileDimension));
+            let enemy = new Enemy(100, new Vec2(tileDimension-1, tileDimension-1));
             enemy.position = new Vec2(pathCoords[0].x * tileDimension, 
                                       pathCoords[0].y * tileDimension);
             enemy.prevEnemy = level1Enemies.peek();
+            healthBarsRendering.addChild(enemy.healthBar);
             level1Enemies.enqueue(enemy);
         }
         level1 = new Level(level1Enemies);
@@ -140,8 +153,11 @@ function init(){
     currentLevel = levels[0];
     // add containers in the order 
     // which they should appear
+    gameScene.addChild(tilesRendering);
     gameScene.addChild(pathsRendering);
+    gameScene.addChild(towersRendering);
     gameScene.addChild(enemiesRendering);
+    gameScene.addChild(healthBarsRendering);
     app.stage.addChild(background);
     app.stage.addChild(gameScene);
     gameScene.addChild(FPSCounter);
@@ -211,12 +227,14 @@ function runMiscUpdateFunctions(){
 
 function resetOnscreenEnemies(){
     enemiesRendering.removeChildren();
+    healthBarsRendering.removeChildren();
     if (enemies.length == 0)
         return;
 
     enemies = enemies.filter(enemy => enemy.alive);
     for (let enemy of enemies){
         enemiesRendering.addChild(enemy.renderer);
+        healthBarsRendering.addChild(enemy.healthBar);
     }
 }
 
@@ -261,7 +279,6 @@ function getRandomDirection(){
     return newDirection;
 }
 
-// click functions
 function spawnTower(){
     // make sure there's no tower here
     let towerHere = towers[stringFromCoords(hoveredTile.coords)] != null && 
@@ -269,7 +286,7 @@ function spawnTower(){
     if (!towerHere){
         let newTower = new Tower(10, 3, 1, hoveredTile.coords);
         towers[stringFromCoords(newTower.coords)] = newTower;
-        gameScene.addChild(newTower);
+        towersRendering.addChild(newTower);
     }
 }
 
