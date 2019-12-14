@@ -1,3 +1,4 @@
+"use strict";
 class Vec2{
     constructor(x = 0, y = 0){
         this.x = x;
@@ -67,7 +68,7 @@ class Level{
 }
 
 class Enemy{
-    constructor(hp = 0, size = null, speed = 30, spriteURL = "images/placeholder.png"){
+    constructor(hp = 0, size = null, speed = 40, damage = 10, spriteURL = "images/placeholder.png"){
         this.renderer = new PIXI.Sprite(getTexture(spriteURL));
         this.renderer.anchor.set(0, 0);// making sure pivot is consistent
         if (size == null){
@@ -86,8 +87,8 @@ class Enemy{
         this.moving = true;
         this.reachedEnd = false;
         this.prevEnemy = null;
-
-        this.healthBar = new HealthBar(this.position, this.hp);
+        this.damage = damage;
+        this.healthBar = new HealthBar(this.position.add(new Vec2(this.bounds.size.x / 2, 0)), this.hp);
     }
 
     update(dt){
@@ -95,6 +96,7 @@ class Enemy{
             return;
         
         this.moving = this.pathIndex < paths.length;
+        this.reachedEnd = !this.moving;
         if (this.prevEnemy != null){
             if (!this.prevEnemy.alive){
                 this.prevEnemy = null;
@@ -139,7 +141,7 @@ class Enemy{
         }
         if(this.reachedEnd){
             // damage the player
-
+            player.doDamage(this.damage * dt);
         }
 
         this.renderer.position = this.position;
@@ -149,6 +151,9 @@ class Enemy{
     }
 
     doDamage(damage){
+        if (!(dmg > 0))
+            return;
+            
         this.hp -= damage;
 
         if (this.hp <= 0){
@@ -479,24 +484,37 @@ class Line extends PIXI.Graphics{
 
 class Player extends PIXI.Sprite{
     constructor (position, hp, money){
-        super(getTexture("images/tower.png"));
-        this.anchor.set(0.5, 0.5);// tower will rotate, pivot will be in center
+        super(getTexture());
+        this.anchor.set(0, 0);// tower will rotate, pivot will be in center
         this.width = tileDimension;
         this.height = tileDimension;
         this.x = position.x;
         this.y = position.y;
+        this.tint = 0x00FFFF;
         this.position = position;
         this.hp = hp;
         this.money = money;
-        this.healthBar = new HealthBar(this.position, this.hp);
+        this.healthBar = new HealthBar(position.add(new Vec2(this.width / 2, 0)), this.hp);
+        this.alive = true;
     }
 
     update(){
-        if (this.hp <= 0){
+        if (!this.alive){
             // game over
         }
+        let position = new Vec2(this.x, this.y);
+        this.healthBar.update(position.add(new Vec2(this.width / 2, 0)), this.hp);
+    }
 
-        this.healthBar.update(this.position, this.hp);
+    doDamage(dmg){
+        if (!(dmg > 0))
+            return;
+
+        this.hp -= dmg;
+        if (this.hp <= 0){
+            this.alive = false;
+            this.hp = 0;
+        }
     }
 }
 

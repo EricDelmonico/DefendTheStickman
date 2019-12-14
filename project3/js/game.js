@@ -43,7 +43,8 @@ let gameScene,
     currentKeyIndex = 0,
     towersRendering,
     tilesRendering,
-    healthBarsRendering;
+    healthBarsRendering,
+    player;
 function init(){
     enemies = [];
     levels = [];
@@ -61,7 +62,9 @@ function init(){
 
     tiles = [];
     let tileSz = new Vec2(tileDimension, tileDimension);
-    // Make paths manually
+    // Make paths manually,
+    // and make the player at 
+    // the final path's position
     pathsMap = [];
     {
         for (let i = 0; i < tilesHigh; i++){
@@ -81,6 +84,7 @@ function init(){
         paths.push(new Path(directions.DOWN, 5));
         paths.push(new Path(directions.LEFT, 2));                
         paths.push(new Path(directions.UP, 5));
+        let finalPathDirection = paths[paths.length - 1].dir;
         let curPathCoords = new Vec2(13, 12);
         for (let i = 0; i < paths.length; i++){
             paths[i].startPosition.x = curPathCoords.x * tileDimension;
@@ -89,6 +93,11 @@ function init(){
             paths[i].endPosition.x = curPathCoords.x * tileDimension;
             paths[i].endPosition.y = curPathCoords.y * tileDimension;  
         }
+        let playerCoords = curPathCoords.add(finalPathDirection);
+        player = new Player(new Vec2(playerCoords.x * tileDimension, // x position
+                                     playerCoords.y * tileDimension),// y position
+                            1000,                                    // health
+                            100);                                    // money
     }
 
     // Make tiles and show sprites where paths are
@@ -157,6 +166,8 @@ function init(){
     gameScene.addChild(pathsRendering);
     gameScene.addChild(towersRendering);
     gameScene.addChild(enemiesRendering);
+    gameScene.addChild(player);
+    gameScene.addChild(player.healthBar);
     gameScene.addChild(healthBarsRendering);
     app.stage.addChild(background);
     app.stage.addChild(gameScene);
@@ -186,6 +197,9 @@ function update(){
     }
     let dt = 1/app.ticker.FPS;
     if (dt > 1/12) dt = 1/12;
+
+    // update the player
+    player.update();
 
     // update enemies
     {
