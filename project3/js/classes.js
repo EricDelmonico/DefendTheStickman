@@ -1,5 +1,3 @@
-
-
 class Vec2{
     constructor(x = 0, y = 0){
         this.x = x;
@@ -87,7 +85,9 @@ class Enemy{
         this.hp = hp;
         this.pathIndex = 0;
         this.speed = speed;
-        this.moving = false;
+        this.moving = true;
+        this.reachedEnd = false;
+        this.prevEnemy = null;
     }
 
     update(dt){
@@ -95,6 +95,15 @@ class Enemy{
             return;
 
         this.moving = this.pathIndex < paths.length;
+        if (this.prevEnemy != null){
+            if (!this.prevEnemy.alive){
+                this.prevEnemy = null;
+            }
+            else{
+                this.moving = this.moving && !this.prevEnemy.bounds.intersects(this.bounds);
+            }
+        }
+
         // code to move the enemies
         if(this.moving){
             let path = paths[this.pathIndex];
@@ -128,8 +137,9 @@ class Enemy{
             if (dt != undefined && this.pathIndex < paths.length)
                 this.position = this.position.add(paths[this.pathIndex].dir.multiply(this.speed).multiply(dt));
         }
-        else{
+        if(this.reachedEnd){
             // damage the player
+
         }
 
         this.renderer.position = this.position;
@@ -456,6 +466,16 @@ class Line extends PIXI.Graphics{
         this.lineTo(endPos.x, endPos.y);
     }
 }
+
+class Player{
+    constructor (position, hp, money){
+        this.position = position;
+        this.hp = hp;
+        this.money = money;
+    }
+}
+
+
 
 function getTexture(spriteURL = "images/placeholder.png"){
     return PIXI.loader.resources[spriteURL].texture;

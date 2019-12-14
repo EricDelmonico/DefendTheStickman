@@ -66,9 +66,15 @@ function init(){
         pathCoords = [];
         // create paths
         paths = [];
+        paths.push(new Path(directions.UP, 8));
+        paths.push(new Path(directions.LEFT, 2));
+        paths.push(new Path(directions.DOWN, 5));
+        paths.push(new Path(directions.LEFT, 2));                
         paths.push(new Path(directions.UP, 5));
-        paths.push(new Path(directions.LEFT, 7));
-        paths.push(new Path(directions.UP, 3));        
+        paths.push(new Path(directions.LEFT, 2));
+        paths.push(new Path(directions.DOWN, 5));
+        paths.push(new Path(directions.LEFT, 2));                
+        paths.push(new Path(directions.UP, 5));
         let curPathCoords = new Vec2(13, 12);
         for (let i = 0; i < paths.length; i++){
             paths[i].startPosition.x = curPathCoords.x * tileDimension;
@@ -123,6 +129,7 @@ function init(){
             let enemy = new Enemy(100, new Vec2(tileDimension, tileDimension));
             enemy.position = new Vec2(pathCoords[0].x * tileDimension, 
                                       pathCoords[0].y * tileDimension);
+            enemy.prevEnemy = level1Enemies.peek();
             level1Enemies.enqueue(enemy);
         }
         level1 = new Level(level1Enemies);
