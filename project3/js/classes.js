@@ -54,16 +54,108 @@ const directions = {
     RIGHT: new Vec2(1, 0)
 }
 
+const enemyTypes = {
+    FAST: [70, new Vec2(50-1,50-1), 120, 8],
+    STRONG: [200, new Vec2(50-1,50-1), 25, 15],
+    NORMAL: [100, new Vec2(50-1,50-1), 40, 10]
+}
+
 class Level{
     // pass in all paths in the level
-    constructor(enemies, paths){
+    constructor(enemies, paths, waves, levelNumber){
         this.enemies = enemies;
         this.paths = paths;
         this.currentTime = 0;
+        this.waves = waves;
+        this.levelNumber = levelNumber;
+        this.currentTime = 0;
+        this.enemySpawnInterval = 1;
+        this.buyPhaseTime = 20;
+        this.timeInBuyPhase = 0;
+        this.waveDry = false;
+        this.buyPhase = false;
+        this.buyPhaseTimer = new HealthBar(new Vec2(600, 10), this.buyPhaseTime * 20);
+        this.currentWave = 0;
+        waveText.text = "Wave: " + this.currentWave;
+    }
+
+    update(dt){
+        this.currentTime += dt;
+        if (this.currentTime > this.enemySpawnInterval){
+            this.spawnNewEnemy();
+            this.currentTime = 0;
+        }
+
+        if (!this.buyPhase){
+            this.buyPhase = this.waveDry && enemies.length == 0;
+            if (this.buyPhase) gameScene.addChild(this.buyPhaseTimer);
+        }
+        if (this.buyPhase){
+            this.timeInBuyPhase += dt;
+            this.buyPhaseTimer.update(this.buyPhaseTimer.position,
+                                      this.timeInBuyPhase * 20);
+            if (this.timeInBuyPhase > this.buyPhaseTime){
+                this.timeInBuyPhase = 0;
+                this.buyPhase = false;
+                this.waveDry = false;
+                gameScene.removeChild(this.buyPhaseTimer);
+            }
+        }
     }
 
     giveNextEnemy(){
+        if (this.enemies.length() == 0){
+            // need new wave soon
+            this.waveDry = true;
+            this.enemies = this.makeNewEnemyWave();
+        }
+        if (this.waveDry || this.buyPhase){
+            return null;
+        }
         return this.enemies.dequeue();
+    }
+
+    makeNewEnemyWave(){
+        this.currentWave++;
+        waveText.text = "Wave: " + this.currentWave;
+        let newWave = new Queue();
+        let enemyNumber = Math.floor(Math.random() * this.currentWave * 2) + this.currentWave;
+        let rng = Math.floor(Math.random() * 3);
+        let e = null;
+        switch (rng){
+            case 0:
+                e = enemyTypes.NORMAL;
+                this.enemySpawnInterval = 3;
+                break;
+            case 1:
+                e = enemyTypes.FAST;
+                this.enemySpawnInterval = 1.5;
+                break;
+            case 2:
+                e = enemyTypes.STRONG;
+                this.enemySpawnInterval = 5;
+                break;
+        }
+        for (let i = 0; i < enemyNumber; i++){
+            let newEnemy = new Enemy(e[0], e[1], e[2], e[3]);
+            newEnemy.position = new Vec2(pathCoords[0].x * tileDimension, 
+                                         pathCoords[0].y * tileDimension);
+            newEnemy.position = newEnemy.position.add(paths[0].dir.multiply(-tileDimension));
+            newEnemy.prevEnemy = newWave.peek();
+            if (newEnemy.prevEnemy != null){
+                newEnemy.prevEnemy.nextEnemy = newEnemy;
+            }
+            newWave.enqueue(newEnemy);
+        }
+        return newWave;
+    }
+
+    spawnNewEnemy(){
+        let newEnemy = this.giveNextEnemy();
+        // don't push null to the stage
+        if (newEnemy != null){
+            enemies.push(newEnemy);
+        }
     }
 }
 
@@ -87,6 +179,7 @@ class Enemy{
         this.moving = true;
         this.reachedEnd = false;
         this.prevEnemy = null;
+        this.nextEnemy = null;
         this.damage = damage;
         this.healthBar = new HealthBar(this.position.add(new Vec2(this.bounds.size.x / 2, 0)), this.hp);
     }
@@ -151,14 +244,18 @@ class Enemy{
     }
 
     doDamage(damage){
-        if (!(dmg > 0))
+        if (!(damage > 0))
             return;
-            
+
         this.hp -= damage;
 
         if (this.hp <= 0){
             this.alive = false;
             this.hp = 0;
+            if (this.nextEnemy != null && this.prevEnemy != null){
+                this.nextEnemy.prevEnemy = this.prevEnemy;
+            }
+            player.changeMoneyBy(50);
         }
     }
 }
@@ -303,13 +400,15 @@ class Queue{
     peek(){
         return this.array[this.array.length - 1];
     }
+
+    length(){
+        return this.array.length;
+    }
 }
 
-// tile inherits from PIXI.Graphics for speed,
-// unlike Enemy and Rectangle
 class Tile extends PIXI.Sprite{
-    constructor(position = new Vec2(), size = new Vec2(40, 40), onclick = null){
-        super(getTexture());
+    constructor(position = new Vec2(), size = new Vec2(40, 40), onclick = null, spriteName = "images/placeholder.png"){
+        super(getTexture(spriteName));
         this.bounds = new Bounds(position, size);
         this.anchor.set(0, 0);// making sure pivot is consistent
         this.width = size.x;
@@ -494,8 +593,10 @@ class Player extends PIXI.Sprite{
         this.position = position;
         this.hp = hp;
         this.money = money;
-        this.healthBar = new HealthBar(position.add(new Vec2(this.width / 2, 0)), this.hp);
+        this.healthBar = new HealthBar(position.add(new Vec2(this.width / 2, -20)), this.hp / 2);
+        this.healthBar.size = this.healthBar.size.add(new Vec2(0, 10));
         this.alive = true;
+        moneyText.text = "Money: " + this.money;
     }
 
     update(){
@@ -503,7 +604,7 @@ class Player extends PIXI.Sprite{
             // game over
         }
         let position = new Vec2(this.x, this.y);
-        this.healthBar.update(position.add(new Vec2(this.width / 2, 0)), this.hp);
+        this.healthBar.update(position.add(new Vec2(this.width / 2, -20)), this.hp / 2);
     }
 
     doDamage(dmg){
@@ -515,6 +616,11 @@ class Player extends PIXI.Sprite{
             this.alive = false;
             this.hp = 0;
         }
+    }
+
+    changeMoneyBy(amnt){
+        this.money += amnt;
+        moneyText.text = "Money: " + this.money;
     }
 }
 

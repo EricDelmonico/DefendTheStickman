@@ -3,7 +3,7 @@ let type = "WebGL";
 if(!PIXI.utils.isWebGLSupported()){
     type = "canvas";
 }
-let app = new PIXI.Application(600, 400);
+let app = new PIXI.Application();
 let tileDimension = 50;
 document.body.appendChild(app.view);
 let tilesWide = app.view.width / tileDimension;
@@ -11,7 +11,11 @@ let tilesHigh = app.view.height / tileDimension;
 
 // load all images
 PIXI.Loader.shared.
-add(["images/placeholder.png", "images/dirtPath.png", "images/tower.png"]).
+add(["images/placeholder.png", 
+     "images/dirtPath.png", 
+     "images/tower.png",
+     "images/pauseButton.png",
+     "images/endBuyButton.png"]).
 on("progress",e=>{console.log(`progress=${e.progress}`)}).
 load(init);
 
@@ -36,15 +40,19 @@ let gameScene,
     pathsMap,
     pathCoords,
     paths,
-    enemySpawnInterval = 3.5,
-    currentTime = 0,
     projectiles,
     currentKey = "",
     currentKeyIndex = 0,
     towersRendering,
     tilesRendering,
     healthBarsRendering,
-    player;
+    player,
+    currentWave = 0,
+    UIRendering,
+    moneyText,
+    waveText,
+    basicTowerCost = 100,
+    paused = false;
 function init(){
     enemies = [];
     levels = [];
@@ -59,6 +67,58 @@ function init(){
     towersRendering = new PIXI.Container();
     tilesRendering = new PIXI.Container();
     healthBarsRendering = new PIXI.Container();
+    UIRendering = new PIXI.Container();
+
+    // create UI
+    {
+        //create fps counter
+        {
+            let textStyle = new PIXI.TextStyle({
+                fill: 0xFF00FF,
+                fontSize: 20,
+                fontFamily: "Futura",
+                stroke: 0xFF00FF,
+                strokeThickness: 0.5
+            });
+            FPSCounter = new PIXI.Text();
+            FPSCounter.style = textStyle;
+            FPSCounter.x = 5;
+            FPSCounter.y = 5;
+            //UIRendering.addChild(FPSCounter);
+        }
+
+        // Create text to show the player's score
+        {
+            let textStyle = new PIXI.TextStyle({
+                fill: 0x000000,
+                fontSize: 30,
+                fontFamily: "Futura",
+                stroke: 0x000000,
+                strokeThickness: 0.5
+            });
+            moneyText = new PIXI.Text();
+            moneyText.style = textStyle;
+            moneyText.x = 5;
+            moneyText.y = 50;
+            UIRendering.addChild(moneyText);
+        }
+
+        // Create text to show the player's score
+        {
+            let textStyle = new PIXI.TextStyle({
+                fill: 0x000000,
+                fontSize: 30,
+                fontFamily: "Futura",
+                stroke: 0x000000,
+                strokeThickness: 0.5
+            });
+            waveText = new PIXI.Text();
+            waveText.style = textStyle;
+            waveText.x = 5;
+            waveText.y = 80;
+            UIRendering.addChild(waveText);
+        }
+    }
 
     tiles = [];
     let tileSz = new Vec2(tileDimension, tileDimension);
@@ -117,6 +177,25 @@ function init(){
                     tiles.push(newTile);
                     continue;
                 }
+                if (i == 0 && j == 0){
+                    let pos = new Vec2(j * tileDimension, i * tileDimension);
+                    let newTile = new Tile(pos, tileSz, togglePause, "images/pauseButton.png");
+                    newTile.coords = new Vec2(j, i);
+                    newTile.onclick = togglePause;
+                    tilesRendering.addChild(newTile);
+                    tiles.push(newTile);
+                    continue;
+                }
+                if (i == 0 && (j == 1 || j == 2 || j == 3)){
+                    if (j == 1){
+                        let pos = new Vec2(j * tileDimension, i * tileDimension);
+                        let newTile = new Tile(pos, tileSz.add(new Vec2(tileDimension * 2, 0)), endBuyPeriod, "images/endBuyButton.png");
+                        newTile.coords = new Vec2(j, i);
+                        tilesRendering.addChild(newTile);
+                        tiles.push(newTile);
+                    }
+                    continue;
+                }
                 let pos = new Vec2(j * tileDimension, i * tileDimension);
                 let newTile = new Tile(pos, tileSz);
                 newTile.coords = new Vec2(j, i);
@@ -126,36 +205,11 @@ function init(){
             }
         }
     }
-    
-    //create fps counter
-    {
-        let textStyle = new PIXI.TextStyle({
-            fill: 0xFF00FF,
-            fontSize: 20,
-            fontFamily: "Futura",
-            stroke: 0xFF00FF,
-            strokeThickness: 0.5
-        });
-        FPSCounter = new PIXI.Text();
-        FPSCounter.style = textStyle;
-        FPSCounter.x = 5;
-        FPSCounter.y = 5;
-    }
 
     // Create the first level
     let level1;
     {
-        let level1Enemies = new Queue();
-        for (let i = 0; i < 10; i++){
-            let enemy = new Enemy(100, new Vec2(tileDimension-1, tileDimension-1));
-            enemy.position = new Vec2(pathCoords[0].x * tileDimension, 
-                                      pathCoords[0].y * tileDimension);
-            enemy.prevEnemy = level1Enemies.peek();
-            healthBarsRendering.addChild(enemy.healthBar);
-            level1Enemies.enqueue(enemy);
-        }
-        level1 = new Level(level1Enemies);
-        enemies.push(level1.giveNextEnemy());
+        level1 = new Level(new Queue());
         levels.push(level1);
     }
     
@@ -171,7 +225,7 @@ function init(){
     gameScene.addChild(healthBarsRendering);
     app.stage.addChild(background);
     app.stage.addChild(gameScene);
-    gameScene.addChild(FPSCounter);
+    app.stage.addChild(UIRendering);
     app.ticker.add(update);
 
     app.view.onclick = onclick;
@@ -197,6 +251,7 @@ function update(){
     }
     let dt = 1/app.ticker.FPS;
     if (dt > 1/12) dt = 1/12;
+    if(paused) dt = 0;
 
     // update the player
     player.update();
@@ -206,12 +261,10 @@ function update(){
         for (let i = 0; i < enemies.length; i++){
             enemies[i].update(dt);
         }
-        currentTime += dt;
-        if (currentTime > enemySpawnInterval){
-            spawnNewEnemy();
-            currentTime = 0;
-        }
     }
+
+    // update current level
+    currentLevel.update(dt);
 
     //update towers
     {
@@ -252,13 +305,6 @@ function resetOnscreenEnemies(){
     }
 }
 
-function spawnNewEnemy(){
-    let newEnemy = currentLevel.giveNextEnemy();
-    // don't push null to the stage
-    if (newEnemy != null)
-        enemies.push(newEnemy);
-}
-
 function getMousePosition(){
     let pos = app.renderer.plugins.interaction.mouse.global;
     return new Vec2(pos.x, pos.y);
@@ -297,10 +343,12 @@ function spawnTower(){
     // make sure there's no tower here
     let towerHere = towers[stringFromCoords(hoveredTile.coords)] != null && 
                     towers[stringFromCoords(hoveredTile.coords)] != undefined;
-    if (!towerHere){
-        let newTower = new Tower(10, 3, 1, hoveredTile.coords);
+
+    if (!towerHere && player.money >= basicTowerCost){
+        let newTower = new Tower(10, 5, 1, hoveredTile.coords);
         towers[stringFromCoords(newTower.coords)] = newTower;
         towersRendering.addChild(newTower);
+        player.changeMoneyBy(-basicTowerCost);
     }
 }
 
@@ -373,4 +421,15 @@ function doProjectileEnemyCollisions(){
             }
         }
     }
+}
+
+function togglePause(){
+    paused = !paused;
+}
+
+function endBuyPeriod(){
+    if (!currentLevel.buyPhase)
+        return;
+    
+    currentLevel.timeInBuyPhase = currentLevel.buyPhaseTime - 0.1;
 }
