@@ -23,7 +23,10 @@ add(["images/placeholder.png",
      "images/endBuyButton.png",
      "images/upDamage.png",
      "images/upRange.png",
-     "images/upRateOfFire.png"]).
+     "images/upRateOfFire.png",
+     "images/player.png",
+     "images/fastEnemy.png",
+     "images/standardEnemy.png"]).
 on("progress",e=>{console.log(`progress=${e.progress}`)}).
 load(init);
 
@@ -76,7 +79,10 @@ let gameScene,
     highScore,
     yourScoreText,
     yourScore,
-    gameOverScene;
+    gameOverScene,
+    towerCount = 0;
+
+const highScoreKey = "ead1758_highScoreDFNDTHSTKMN";
 function init(){
     enemies = [];
     levels = [];
@@ -196,7 +202,7 @@ function init(){
             gameOverText.x = app.view.width / 2;
             gameOverText.y = app.view.height / 2;
             gameOverText.text = "GAME OVER";
-            UIRendering.addChild(gameOverText);
+            gameOverScene.addChild(gameOverText);
         }
         // create high score text
         {
@@ -212,7 +218,8 @@ function init(){
             highScoreText.anchor.set(0.5, 0.5);
             highScoreText.x = app.view.width / 2;
             highScoreText.y = app.view.height / 2 + 75;
-            highScoreText.text = "High Score: " + highScore;
+            highScore = localStorage.getItem(highScoreKey);
+            gameOverScene.text = "High Score: " + highScore;
             UIRendering.addChild(highScoreText);
             yourScoreText = new PIXI.Text();
             yourScoreText.style = textStyle;
@@ -220,7 +227,7 @@ function init(){
             yourScoreText.x = app.view.width / 2;
             yourScoreText.y = app.view.height / 2 + 125;
             yourScoreText.text = "Your Score: " + yourScore;
-            UIRendering.addChild(yourScoreText);
+            gameOverScene.addChild(yourScoreText);
         }
     }
 
@@ -381,6 +388,18 @@ function update(){
 
     if (gameOver){
         app.stage.removeChild(gameScene);
+        yourScore = currentLevel.currentWave;
+        if (highScore == null){
+            highScore = yourScore;
+        }
+        else{
+            if (highScore < yourScore){
+                highScore = yourScore;
+            }
+        }
+        localStorage.setItem(highScoreKey, highScore);
+        yourScoreText.text = "Your Score: " + yourScore;
+        highScoreText.text = "High Score: " + highScore;
         app.stage.addChild(gameOverScene);
     }
 
@@ -400,7 +419,7 @@ function update(){
         selectedTowerRoF.text = "RoF: " + selectedTower.rateOfFire + " shots per second";
         selectedTowerRange.text = "Range: " + selectedTower.range + " blocks";
         let price = 100;
-        price += selectedTower.upgradesSoFar * 2 * 25;
+        price += Math.pow(selectedTower.upgradesSoFar, 2) * 10;
         upgradeCostText.text = "Cost Per Upgrade: " + price;
     }
     else{
@@ -509,8 +528,8 @@ function spawnTower(){
         towers[stringFromCoords(newTower.coords)] = newTower;
         towersRendering.addChild(newTower);
         player.changeMoneyBy(-basicTowerCost);
-        towerUpgradeSound.play();
-        basicTowerCost += 100;
+        towerCount++;
+        basicTowerCost += Math.pow(towerCount, 2) * 20;
         towerCostText.text = "Tower Cost: " + basicTowerCost;
     }
     else if (!towerHere){
@@ -607,12 +626,11 @@ function UpDamage(){
     }
 
     let price = 100;
-    price += selectedTower.upgradesSoFar * 2 * 25;
+    price += Math.pow(selectedTower.upgradesSoFar, 2) * 10;
     if (player.money >= price){
         player.changeMoneyBy(-price);
         selectedTower.upgradesSoFar++;
         selectedTower.damage += 7;
-        towerUpgradeSound.play();
     }
     else{
         errorSound.play();
@@ -626,12 +644,11 @@ function UpRange(){
     }
 
     let price = 100;
-    price += selectedTower.upgradesSoFar * 2 * 25;
+    price += Math.pow(selectedTower.upgradesSoFar, 2) * 10;
     if (player.money >= price){
         player.changeMoneyBy(-price);
         selectedTower.upgradesSoFar++;
         selectedTower.range += 0.5;
-        towerUpgradeSound.play();
     }
     else{
         errorSound.play();
@@ -645,12 +662,11 @@ function UpRateOfFire(){
     }
 
     let price = 100;
-    price += selectedTower.upgradesSoFar * 2 * 25;
+    price += Math.pow(selectedTower.upgradesSoFar, 2) * 10;
     if (player.money >= price){
         player.changeMoneyBy(-price);
         selectedTower.upgradesSoFar++;
         selectedTower.rateOfFire += 0.5;
-        towerUpgradeSound.play();
     }
     else{
         errorSound.play();

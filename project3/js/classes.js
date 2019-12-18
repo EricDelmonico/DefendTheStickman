@@ -55,8 +55,8 @@ const directions = {
 }
 
 const enemyTypes = {
-    FAST: [70, new Vec2(50-1,50-1), 120, 8],
-    NORMAL: [100, new Vec2(50-1,50-1), 75, 10]
+    FAST: [70, new Vec2(50-1,50-1), 120, 20, "images/fastEnemy.png"],
+    NORMAL: [100, new Vec2(50-1,50-1), 75, 27, "images/standardEnemy.png"]
 }
 
 class Level{
@@ -98,6 +98,8 @@ class Level{
                 this.buyPhase = false;
                 this.waveDry = false;
                 gameScene.removeChild(this.buyPhaseTimer);
+                this.currentWave++;
+                waveText.text = "Wave: " + this.currentWave;
             }
         }
     }
@@ -115,24 +117,22 @@ class Level{
     }
 
     makeNewEnemyWave(){
-        this.currentWave++;
-        waveText.text = "Wave: " + this.currentWave;
         let newWave = new Queue();
-        let enemyNumber = Math.floor(Math.random() * this.currentWave * 2) + this.currentWave;
+        let enemyNumber = Math.floor(Math.random() * (this.currentWave + 1) * 2) + this.currentWave + 1;
         let rng = Math.floor(Math.random() * 2);
         let e = null;
         switch (rng){
             case 0:
                 e = enemyTypes.NORMAL;
-                this.enemySpawnInterval = 3;
+                this.enemySpawnInterval = 1.5;
                 break;
             case 1:
                 e = enemyTypes.FAST;
-                this.enemySpawnInterval = 1.5;
+                this.enemySpawnInterval = 1;
                 break;
         }
         for (let i = 0; i < enemyNumber; i++){
-            let newEnemy = new Enemy(e[0], e[1], e[2], e[3]);
+            let newEnemy = new Enemy(e[0], e[1], e[2], e[3], e[4]);
             newEnemy.position = new Vec2(pathCoords[0].x * tileDimension, 
                                          pathCoords[0].y * tileDimension);
             newEnemy.position = newEnemy.position.add(paths[0].dir.multiply(-tileDimension));
@@ -519,14 +519,6 @@ class Tower extends PIXI.Sprite{
             if (this.target == null){
                 return;
             }
-
-            // cast a debug line to the target
-            if (this.line != null){
-                app.stage.removeChild(this.line);
-            }
-            let endLine = this.centerPosition.add(vecToEnemy);
-            this.line = new Line(this.centerPosition, endLine);
-            app.stage.addChild(this.line);
             
             let unitVecToEnemy = vecToEnemy.normalize();
             // point tower at enemy
@@ -600,13 +592,12 @@ class Line extends PIXI.Graphics{
 
 class Player extends PIXI.Sprite{
     constructor (position, hp, money){
-        super(getTexture());
+        super(getTexture("images/player.png"));
         this.anchor.set(0, 0);// tower will rotate, pivot will be in center
         this.width = tileDimension;
         this.height = tileDimension;
         this.x = position.x;
         this.y = position.y;
-        this.tint = 0x00FFFF;
         this.position = position;
         this.hp = hp;
         this.money = money;
@@ -638,6 +629,7 @@ class Player extends PIXI.Sprite{
     changeMoneyBy(amnt){
         this.money += amnt;
         moneyText.text = "Money: " + this.money;
+        towerUpgradeSound.play();
     }
 }
 
