@@ -9,6 +9,7 @@ document.body.appendChild(app.view);
 let tilesWide = app.view.width / tileDimension;
 let tilesHigh = app.view.height / tileDimension;
 
+// load all sounds
 const errorSound = PIXI.sound.Sound.from("sounds/errorSound.mp3");
 const towerUpgradeSound = PIXI.sound.Sound.from("sounds/towerUpgradeSound.mp3");
 const shootSound = PIXI.sound.Sound.from("sounds/shootSound.mp3");
@@ -33,7 +34,12 @@ load(init);
 let levelBounds = new Bounds(new Vec2(0, 0), 
                              new Vec2(app.view.width, app.view.height));
 
+// populate the alphabet, lol. 
+// 
+// This is for the getKey() method, and my implementation
+// of individually identifiable projectiles
 let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
+// make all necessary variables
 let gameScene, 
     background,
     enemies,
@@ -83,6 +89,9 @@ let gameScene,
     towerCount = 0;
 
 const highScoreKey = "ead1758_highScoreDFNDTHSTKMN";
+// creates pretty much everything in the 
+// game, this method is very long, so I've 
+// blocked out and named some of the sections
 function init(){
     enemies = [];
     levels = [];
@@ -369,6 +378,9 @@ function init(){
     app.view.onclick = onclick;
 }
 
+// makes a path from the last coordinate on the
+// previous path, taking in a path object with
+// a direction and a length, all that is needed
 function makePath(lastPathCoords, path){
     let newLastPathCoords = lastPathCoords;
     if (path.len <= 0){
@@ -455,16 +467,11 @@ function update(){
     doProjectileEnemyCollisions();
 
     FPSCounter.text = app.ticker.FPS;
-    runMiscUpdateFunctions();
     resetOnscreenEnemies();
 }
 
-function runMiscUpdateFunctions(){
-    for (let e of enemies){
-        e.update();
-    }
-}
-
+// gets dead enemies out of the enemies
+// array, and stops them from rendering
 function resetOnscreenEnemies(){
     enemiesRendering.removeChildren();
     healthBarsRendering.removeChildren();
@@ -478,11 +485,14 @@ function resetOnscreenEnemies(){
     }
 }
 
+// returns the Vec2 position of the mouse cursor
 function getMousePosition(){
     let pos = app.renderer.plugins.interaction.mouse.global;
     return new Vec2(pos.x, pos.y);
 }
 
+// runs various onclick methods
+// whenever the window is clicked
 function onclick(){
     let hoveredCoords = null;
     if (hoveredTile != undefined && hoveredTile.onclick != null){
@@ -495,6 +505,10 @@ function onclick(){
     }
 }
 
+// returns one of the four
+// cardinal directions (from)
+// the enum 'directions' in 
+// the classes.js file
 function getRandomDirection(){
     let rng = Math.floor(Math.random() * 4);
     let newDirection;
@@ -518,6 +532,8 @@ function getRandomDirection(){
     return newDirection;
 }
 
+// spawns a tower on top of
+// the hovered over tile
 function spawnTower(){
     // make sure there's no tower here
     let towerHere = towers[stringFromCoords(hoveredTile.coords)] != null && 
@@ -537,10 +553,19 @@ function spawnTower(){
     }
 }
 
+// returns a string constructed
+// from the passed in Vector 2,
+// used as keys in the towers
+// object so they are identifiable
 function stringFromCoords(vec){
     return `${vec.x},${vec.y}`;
 }
 
+// returns a key that is unused
+// by any of the onscreen projectiles.
+// this method enables projectiles to
+// be individual identifiable without
+// having to check every single one
 function getKey(){
     let projAmnt = 0;
     for (let key in projectiles){
@@ -585,6 +610,8 @@ function getKey(){
     return currentKey;
 }
 
+// this method replaces the letter at the specified
+// index with the letter specified by 'letter'
 function replaceLetterInStr(string, index, letter){
     let finalString = "";
     finalString += string.slice(0, index);
@@ -593,6 +620,8 @@ function replaceLetterInStr(string, index, letter){
     return finalString;
 }
 
+// does what the method name suggests.
+// uses both object's bounds class
 function doProjectileEnemyCollisions(){
     for (let key in projectiles){
         for (let enemy of enemies){
@@ -608,10 +637,15 @@ function doProjectileEnemyCollisions(){
     }
 }
 
+// toggles whether the game is paused  
+// or not (pause button's onclick)
 function togglePause(){
     paused = !paused;
 }
 
+// forces the player out of the buy period,
+// this is the onclick of the endBuyPeriod
+// tile, created for players' convenience
 function endBuyPeriod(){
     if (!currentLevel.buyPhase)
         return;
@@ -619,6 +653,9 @@ function endBuyPeriod(){
     currentLevel.timeInBuyPhase = currentLevel.buyPhaseTime - 0.1;
 }
 
+// these bottom three functions are upgrade 
+// functions to upgrade the tower properties
+// matching the names of the methods' 'suffix'
 function UpDamage(){
     if (selectedTower == null){
         errorSound.play();

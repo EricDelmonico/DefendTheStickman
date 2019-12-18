@@ -1,4 +1,7 @@
 "use strict";
+// a typical vec2 class, but this one is
+// tailor made by me to have just the 
+// functionality i needed for this game
 class Vec2{
     constructor(x = 0, y = 0){
         this.x = x;
@@ -47,6 +50,7 @@ class Vec2{
     }
 }
 
+// a couple of enums
 const directions = {
     UP: new Vec2(0, -1),
     DOWN: new Vec2(0, 1),
@@ -58,7 +62,11 @@ const enemyTypes = {
     FAST: [70, new Vec2(50-1,50-1), 120, 20, "images/fastEnemy.png"],
     NORMAL: [100, new Vec2(50-1,50-1), 75, 27, "images/standardEnemy.png"]
 }
+// end enums
 
+// the level class contains much of the info for each level,
+// including waves and a queue of enemies to spawn. it also
+// handles the spawning of its own enemies, of course
 class Level{
     // pass in all paths in the level
     constructor(enemies, paths, waves, levelNumber){
@@ -104,6 +112,9 @@ class Level{
         }
     }
 
+    // returns the next enemy in the queue,
+    // or null if in the buy phase or the 
+    // enemy queue is out of enemies
     giveNextEnemy(){
         if (this.enemies.length() == 0){
             // need new wave soon
@@ -116,6 +127,8 @@ class Level{
         return this.enemies.dequeue();
     }
 
+    // creates a new queue of enemies when the current queue runs out,
+    // effectively starting the next "wave".
     makeNewEnemyWave(){
         let newWave = new Queue();
         let enemyNumber = Math.floor(Math.random() * (this.currentWave + 1) * 2) + this.currentWave + 1;
@@ -145,6 +158,7 @@ class Level{
         return newWave;
     }
 
+    // spawns the next enemy into the world
     spawnNewEnemy(){
         let newEnemy = this.giveNextEnemy();
         // don't push null to the stage
@@ -154,6 +168,8 @@ class Level{
     }
 }
 
+// the enemy class represents an enemy,
+// and handles its frame-to-frame life
 class Enemy{
     constructor(hp = 0, size = null, speed = 40, damage = 10, spriteURL = "images/placeholder.png"){
         this.renderer = new PIXI.Sprite(getTexture(spriteURL));
@@ -239,6 +255,10 @@ class Enemy{
         this.healthBar.update(this.position.add(new Vec2(this.bounds.size.x / 2, 0)), this.hp);
     }
 
+    // do damage to the enemy.
+    // this updates the health
+    // bar and tests if the 
+    // enemy is dead, as well.
     doDamage(damage){
         if (!(damage > 0))
             return;
@@ -256,6 +276,8 @@ class Enemy{
     }
 }
 
+// a freshly made bounds class to suit my needs,
+// like the Vec2 class it is very typical in implementation
 class Bounds{
     constructor(position = new Vec2(0, 0), size = new Vec2(10, 10)){
         this.size = size;
@@ -310,6 +332,9 @@ class Bounds{
     }
 }
 
+// the health bar class allows me to render health
+// bars to the screen quickly and easily. this can
+// also be used in other ways (see: buyPhaseTimer)
 class HealthBar extends PIXI.Graphics{
     constructor(position, initialHealth){
         super();
@@ -320,6 +345,9 @@ class HealthBar extends PIXI.Graphics{
         this.createRect(position);
     }
 
+    // creates a rectangle representing
+    // maximum health, and one on top of
+    // it representing current health
     createRect(position){
 		this.beginFill(0xFF0000);
 		this.lineStyle(1, 0x000000, 1);
@@ -349,37 +377,10 @@ class HealthBar extends PIXI.Graphics{
         this.x = position.x;
         this.y = position.y;
     }
-
-    intersects(rect)
-    {
-        if (rect == null)
-            return false;
-
-        let b1 = this.bounds;
-        let b2 = rect.bounds;
-
-        // is object 2 to the left of object 1?
-        if (b1.min.x > b2.max.x)
-            return false;
-        // Right?
-        if (b1.max.x < b2.min.x)
-            return false;
-        // Below?
-        if (b1.max.y < b2.min.y)
-            return false;
-        // Above?
-        if (b1.min.y > b2.max.y)
-            return false;
-
-        // inside?
-        return true;
-    }
-
-    contains(pos){
-        return this.bounds.contains(pos);
-    }
 }
 
+// this is a very runof-the-mill queue class,
+// made specifically for my needs so it's not fully featured
 class Queue{
     constructor(){
         this.array = [];
@@ -402,6 +403,9 @@ class Queue{
     }
 }
 
+// tiles represent each tile in the game.
+// they can contain an onclick method,
+// they can do actions on hover, etc
 class Tile extends PIXI.Sprite{
     constructor(position = new Vec2(), size = new Vec2(40, 40), onclick = null, spriteName = "images/placeholder.png"){
         super(getTexture(spriteName));
@@ -426,6 +430,8 @@ class Tile extends PIXI.Sprite{
         this.selectedTile();
     }
 
+    // self-explanatory,
+    // tints the tile
     tintTile(){
         if (towers[stringFromCoords(this.coords)] != null && 
             towers[stringFromCoords(this.coords)] != undefined){
@@ -435,17 +441,23 @@ class Tile extends PIXI.Sprite{
         this.tint = 0x00FF00;
     }
 
+    // if the selected tower is on this tile,
+    // tint this tile cyan. make sure this
+    // is called after the tintTile() method
     selectedTile(){
         if (selectedTower != null && this.coords.equals(selectedTower.coords)){
             this.tint = 0x00FFFF;
         }
     }
     
+    // untints the tile
     untintTile(){
         this.tint = 0xEEEEEE;
     }
 }
 
+// the pathrenderer is the visual representation
+// of the path class
 class PathRenderer extends PIXI.Sprite{
     constructor(position = new Vec2(), size = new Vec2(tileDimension, tileDimension)){
         super(getTexture("images/dirtPath.png"));
@@ -457,6 +469,8 @@ class PathRenderer extends PIXI.Sprite{
     }
 }
 
+// the path class represents each stretch of
+// road in the level/map with numbers
 class Path {
     constructor(direction, length){
         this.dir = direction;
@@ -466,6 +480,8 @@ class Path {
     }
 }
 
+// the tower class represents a turret placed in the world.
+// it handles the firing of projectiles
 class Tower extends PIXI.Sprite{
     constructor(damage, range, rateOfFire, coords){
         super(getTexture("images/tower.png"));
@@ -487,6 +503,9 @@ class Tower extends PIXI.Sprite{
         this.upgradesSoFar = 0;
     }
 
+    // this is the onclick of all the towers
+    // by default. it will set the selected
+    // tower to itself
     selectTower(){
         if (selectedTower != this){
             selectedTower = this;
@@ -540,6 +559,8 @@ class Tower extends PIXI.Sprite{
     }
 }
 
+// the projectile class handles all things
+// projectile, namely their movement and deletion
 class Projectile extends PIXI.Sprite{
     constructor(position, size, speed, rotation, damage, key){
         super(getTexture());
@@ -571,6 +592,8 @@ class Projectile extends PIXI.Sprite{
         this.bounds.update();
     }
 
+    // deletes this projectile from 
+    // everywhere it is referenced
     deleteProj(){
         gameScene.removeChild(this);
         delete projectiles[this.key];
@@ -581,6 +604,8 @@ class Projectile extends PIXI.Sprite{
     }
 }
 
+// the line class is used to draw debug lines only,
+// so it won't be seen in the final version
 class Line extends PIXI.Graphics{
     constructor(startPos, endPos){
         super();
@@ -590,6 +615,8 @@ class Line extends PIXI.Graphics{
     }
 }
 
+// the player class represents the player
+// a.k.a. the king stickman
 class Player extends PIXI.Sprite{
     constructor (position, hp, money){
         super(getTexture("images/player.png"));
@@ -615,6 +642,8 @@ class Player extends PIXI.Sprite{
         this.healthBar.update(position.add(new Vec2(this.width / 2, -20)), this.hp / 2);
     }
 
+    // same as the doDamage for the enemy--will
+    // update the healthbar and check if dead
     doDamage(dmg){
         if (!(dmg > 0))
             return;
@@ -626,6 +655,9 @@ class Player extends PIXI.Sprite{
         }
     }
 
+    // changes the player's money
+    // and updates the money text
+    // to reflect the changes
     changeMoneyBy(amnt){
         this.money += amnt;
         moneyText.text = "Money: " + this.money;
@@ -633,6 +665,7 @@ class Player extends PIXI.Sprite{
     }
 }
 
+// gets the texture at the provided url, or sends back a placeholder by default
 function getTexture(spriteURL = "images/placeholder.png"){
     return PIXI.loader.resources[spriteURL].texture;
 }
