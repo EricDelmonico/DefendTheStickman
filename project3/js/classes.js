@@ -25,7 +25,7 @@ class Vec2{
     }
 
     floor(){
-        return new Vec2(Math.floor(this.x), Math.floor(this.y))
+        return new Vec2(Math.floor(this.x), Math.floor(this.y));
     }
 
     normalize(){
@@ -56,8 +56,7 @@ const directions = {
 
 const enemyTypes = {
     FAST: [70, new Vec2(50-1,50-1), 120, 8],
-    STRONG: [200, new Vec2(50-1,50-1), 25, 15],
-    NORMAL: [100, new Vec2(50-1,50-1), 40, 10]
+    NORMAL: [100, new Vec2(50-1,50-1), 75, 10]
 }
 
 class Level{
@@ -120,7 +119,7 @@ class Level{
         waveText.text = "Wave: " + this.currentWave;
         let newWave = new Queue();
         let enemyNumber = Math.floor(Math.random() * this.currentWave * 2) + this.currentWave;
-        let rng = Math.floor(Math.random() * 3);
+        let rng = Math.floor(Math.random() * 2);
         let e = null;
         switch (rng){
             case 0:
@@ -130,10 +129,6 @@ class Level{
             case 1:
                 e = enemyTypes.FAST;
                 this.enemySpawnInterval = 1.5;
-                break;
-            case 2:
-                e = enemyTypes.STRONG;
-                this.enemySpawnInterval = 5;
                 break;
         }
         for (let i = 0; i < enemyNumber; i++){
@@ -174,8 +169,9 @@ class Enemy{
         this.bounds = new Bounds(this.position, new Vec2(this.renderer.width, this.renderer.height));
         this.alive = true;
         this.hp = hp;
+        this.hp += Math.pow(currentLevel.currentWave, 1.5) * 7;
         this.pathIndex = 0;
-        this.speed = speed;
+        this.speed = speed + speed / enemyTypes.NORMAL[2] * currentLevel.currentWave;
         this.moving = true;
         this.reachedEnd = false;
         this.prevEnemy = null;
@@ -427,6 +423,7 @@ class Tile extends PIXI.Sprite{
         else{
             this.untintTile()
         }
+        this.selectedTile();
     }
 
     tintTile(){
@@ -436,6 +433,12 @@ class Tile extends PIXI.Sprite{
             return;
         }
         this.tint = 0x00FF00;
+    }
+
+    selectedTile(){
+        if (selectedTower != null && this.coords.equals(selectedTower.coords)){
+            this.tint = 0x00FFFF;
+        }
     }
     
     untintTile(){
@@ -480,9 +483,22 @@ class Tower extends PIXI.Sprite{
         this.target = null;
         this.timeSinceLastShot = 0;
         this.timeBetweenShots = 1 / rateOfFire;
+        this.onclick = this.selectTower;
+        this.upgradesSoFar = 0;
+    }
+
+    selectTower(){
+        if (selectedTower != this){
+            selectedTower = this;
+        }
+        else{
+            selectedTower = null;
+        }
     }
 
     update(dt){
+        this.timeBetweenShots = 1 / this.rateOfFire;
+
         this.target = null;
         let enemySz = new Vec2(tileDimension, tileDimension);
         
@@ -517,13 +533,14 @@ class Tower extends PIXI.Sprite{
             this.rotation = Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x);
             if (this.target != null && this.target != undefined){
                 let proj = new Projectile(new Vec2(this.x, this.y), 
-                                          new Vec2(5, 5), 
-                                          500, 
+                                          new Vec2(7, 7), 
+                                          750, 
                                           Math.atan2(unitVecToEnemy.y, unitVecToEnemy.x),
                                           this.damage,
                                           getKey());
                 projectiles[proj.key] = proj;
                 gameScene.addChild(proj);
+                shootSound.play();
             }
         }
 

@@ -9,13 +9,21 @@ document.body.appendChild(app.view);
 let tilesWide = app.view.width / tileDimension;
 let tilesHigh = app.view.height / tileDimension;
 
+const errorSound = PIXI.sound.Sound.from("sounds/errorSound.mp3");
+const towerUpgradeSound = PIXI.sound.Sound.from("sounds/towerUpgradeSound.mp3");
+const shootSound = PIXI.sound.Sound.from("sounds/shootSound.mp3");
+const playerDamageSound = PIXI.sound.Sound.from("sounds/playerDamageSound.mp3");
+
 // load all images
 PIXI.Loader.shared.
 add(["images/placeholder.png", 
      "images/dirtPath.png", 
      "images/tower.png",
      "images/pauseButton.png",
-     "images/endBuyButton.png"]).
+     "images/endBuyButton.png",
+     "images/upDamage.png",
+     "images/upRange.png",
+     "images/upRateOfFire.png"]).
 on("progress",e=>{console.log(`progress=${e.progress}`)}).
 load(init);
 
@@ -52,7 +60,23 @@ let gameScene,
     moneyText,
     waveText,
     basicTowerCost = 100,
-    paused = false;
+    paused = false,
+    selectedTower,
+    rangeUpButton,
+    dmgUpButton,
+    rateOfFireUpButton,
+    selectedTowerRange,
+    selectedTowerRoF,
+    selectedTowerDamage,
+    upgradeCostText,
+    towerCostText,
+    gameOver = false,
+    gameOverText,
+    highScoreText,
+    highScore,
+    yourScoreText,
+    yourScore,
+    gameOverScene;
 function init(){
     enemies = [];
     levels = [];
@@ -68,6 +92,7 @@ function init(){
     tilesRendering = new PIXI.Container();
     healthBarsRendering = new PIXI.Container();
     UIRendering = new PIXI.Container();
+    gameOverScene = new PIXI.Container();
 
     // create UI
     {
@@ -87,7 +112,7 @@ function init(){
             //UIRendering.addChild(FPSCounter);
         }
 
-        // Create text to show the player's score
+        // Create text to show the player's money
         {
             let textStyle = new PIXI.TextStyle({
                 fill: 0x000000,
@@ -103,7 +128,7 @@ function init(){
             UIRendering.addChild(moneyText);
         }
 
-        // Create text to show the player's score
+        // Create text to show the wave
         {
             let textStyle = new PIXI.TextStyle({
                 fill: 0x000000,
@@ -117,6 +142,85 @@ function init(){
             waveText.x = 5;
             waveText.y = 80;
             UIRendering.addChild(waveText);
+        }
+
+        // create the tower stats text
+        {
+            let textStyle = new PIXI.TextStyle({
+                fill: 0x000000,
+                fontSize: 20,
+                fontFamily: "Futura",
+                stroke: 0x000000,
+                strokeThickness: 0.5
+            });
+            selectedTowerRange = new PIXI.Text();
+            selectedTowerRange.style = textStyle;
+            selectedTowerRange.x = 5;
+            selectedTowerRange.y = 150;
+            UIRendering.addChild(selectedTowerRange);
+            selectedTowerRoF = new PIXI.Text();
+            selectedTowerRoF.style = textStyle;
+            selectedTowerRoF.x = 5;
+            selectedTowerRoF.y = 175;
+            UIRendering.addChild(selectedTowerRoF);
+            selectedTowerDamage = new PIXI.Text();
+            selectedTowerDamage.style = textStyle;
+            selectedTowerDamage.x = 5;
+            selectedTowerDamage.y = 200;
+            UIRendering.addChild(selectedTowerDamage);
+            upgradeCostText = new PIXI.Text();
+            upgradeCostText.style = textStyle;
+            upgradeCostText.x = 5;
+            upgradeCostText.y = 525;
+            UIRendering.addChild(upgradeCostText);
+            towerCostText = new PIXI.Text();
+            towerCostText.style = textStyle;
+            towerCostText.x = 5;
+            towerCostText.y = 225;
+            towerCostText.text = "Tower Cost: " + basicTowerCost;;
+            UIRendering.addChild(towerCostText);
+        }
+
+        // Create game over text
+        {
+            let textStyle = new PIXI.TextStyle({
+                fill: 0x000000,
+                fontSize: 100,
+                fontFamily: "Futura",
+                stroke: 0xFFFFFF,
+                strokeThickness: 1
+            });
+            gameOverText = new PIXI.Text();
+            gameOverText.style = textStyle;
+            gameOverText.anchor.set(0.5, 0.5);
+            gameOverText.x = app.view.width / 2;
+            gameOverText.y = app.view.height / 2;
+            gameOverText.text = "GAME OVER";
+            UIRendering.addChild(gameOverText);
+        }
+        // create high score text
+        {
+            let textStyle = new PIXI.TextStyle({
+                fill: 0x000000,
+                fontSize: 50,
+                fontFamily: "Futura",
+                stroke: 0xFFFFFF,
+                strokeThickness: 1
+            });
+            highScoreText = new PIXI.Text();
+            highScoreText.style = textStyle;
+            highScoreText.anchor.set(0.5, 0.5);
+            highScoreText.x = app.view.width / 2;
+            highScoreText.y = app.view.height / 2 + 75;
+            highScoreText.text = "High Score: " + highScore;
+            UIRendering.addChild(highScoreText);
+            yourScoreText = new PIXI.Text();
+            yourScoreText.style = textStyle;
+            yourScoreText.anchor.set(0.5, 0.5);
+            yourScoreText.x = app.view.width / 2;
+            yourScoreText.y = app.view.height / 2 + 125;
+            yourScoreText.text = "Your Score: " + yourScore;
+            UIRendering.addChild(yourScoreText);
         }
     }
 
@@ -196,6 +300,33 @@ function init(){
                     }
                     continue;
                 }
+                if (i == tilesHigh - 1 && j == 0){
+                    let pos = new Vec2(j * tileDimension, i * tileDimension);
+                    let newTile = new Tile(pos, tileSz, togglePause, "images/upDamage.png");
+                    newTile.coords = new Vec2(j, i);
+                    newTile.onclick = UpDamage;
+                    tilesRendering.addChild(newTile);
+                    tiles.push(newTile);
+                    continue;
+                }
+                if (i == tilesHigh - 1 && j == 1){
+                    let pos = new Vec2(j * tileDimension, i * tileDimension);
+                    let newTile = new Tile(pos, tileSz, togglePause, "images/upRange.png");
+                    newTile.coords = new Vec2(j, i);
+                    newTile.onclick = UpRange;
+                    tilesRendering.addChild(newTile);
+                    tiles.push(newTile);
+                    continue;
+                }
+                if (i == tilesHigh - 1 && j == 2){
+                    let pos = new Vec2(j * tileDimension, i * tileDimension);
+                    let newTile = new Tile(pos, tileSz, togglePause, "images/upRateOfFire.png");
+                    newTile.coords = new Vec2(j, i);
+                    newTile.onclick = UpRateOfFire;
+                    tilesRendering.addChild(newTile);
+                    tiles.push(newTile);
+                    continue;
+                }
                 let pos = new Vec2(j * tileDimension, i * tileDimension);
                 let newTile = new Tile(pos, tileSz);
                 newTile.coords = new Vec2(j, i);
@@ -245,16 +376,39 @@ function makePath(lastPathCoords, path){
 
 let frame = 0;
 function update(){
+    // check if the player is dead
+    gameOver = !player.alive;
+
+    if (gameOver){
+        app.stage.removeChild(gameScene);
+        app.stage.addChild(gameOverScene);
+    }
+
     // update tiles
     for (let tile of tiles){
         tile.update(getMousePosition());
     }
     let dt = 1/app.ticker.FPS;
     if (dt > 1/12) dt = 1/12;
-    if(paused) dt = 0;
+    if(paused || gameOver) dt = 0;
 
     // update the player
     player.update();
+
+    if (selectedTower != null){
+        selectedTowerDamage.text = "Damage: " + selectedTower.damage + " hp";
+        selectedTowerRoF.text = "RoF: " + selectedTower.rateOfFire + " shots per second";
+        selectedTowerRange.text = "Range: " + selectedTower.range + " blocks";
+        let price = 100;
+        price += selectedTower.upgradesSoFar * 2 * 25;
+        upgradeCostText.text = "Cost Per Upgrade: " + price;
+    }
+    else{
+        selectedTowerDamage.text = "";
+        selectedTowerRoF.text = "";
+        selectedTowerRange.text = "";
+        upgradeCostText.text = "";
+    }
 
     // update enemies
     {
@@ -311,8 +465,14 @@ function getMousePosition(){
 }
 
 function onclick(){
+    let hoveredCoords = null;
     if (hoveredTile != undefined && hoveredTile.onclick != null){
         hoveredTile.onclick();
+        hoveredCoords = hoveredTile.coords;
+    }
+
+    if (hoveredCoords != null && towers[stringFromCoords(hoveredCoords)]){
+        towers[stringFromCoords(hoveredCoords)].onclick();
     }
 }
 
@@ -345,10 +505,16 @@ function spawnTower(){
                     towers[stringFromCoords(hoveredTile.coords)] != undefined;
 
     if (!towerHere && player.money >= basicTowerCost){
-        let newTower = new Tower(10, 5, 1, hoveredTile.coords);
+        let newTower = new Tower(10, 3.5, 1, hoveredTile.coords);
         towers[stringFromCoords(newTower.coords)] = newTower;
         towersRendering.addChild(newTower);
         player.changeMoneyBy(-basicTowerCost);
+        towerUpgradeSound.play();
+        basicTowerCost += 100;
+        towerCostText.text = "Tower Cost: " + basicTowerCost;
+    }
+    else if (!towerHere){
+        errorSound.play();
     }
 }
 
@@ -432,4 +598,61 @@ function endBuyPeriod(){
         return;
     
     currentLevel.timeInBuyPhase = currentLevel.buyPhaseTime - 0.1;
+}
+
+function UpDamage(){
+    if (selectedTower == null){
+        errorSound.play();
+        return;
+    }
+
+    let price = 100;
+    price += selectedTower.upgradesSoFar * 2 * 25;
+    if (player.money >= price){
+        player.changeMoneyBy(-price);
+        selectedTower.upgradesSoFar++;
+        selectedTower.damage += 7;
+        towerUpgradeSound.play();
+    }
+    else{
+        errorSound.play();
+    }
+}
+
+function UpRange(){
+    if (selectedTower == null){
+        errorSound.play();
+        return;
+    }
+
+    let price = 100;
+    price += selectedTower.upgradesSoFar * 2 * 25;
+    if (player.money >= price){
+        player.changeMoneyBy(-price);
+        selectedTower.upgradesSoFar++;
+        selectedTower.range += 0.5;
+        towerUpgradeSound.play();
+    }
+    else{
+        errorSound.play();
+    }
+}
+
+function UpRateOfFire(){
+    if (selectedTower == null){
+        errorSound.play();
+        return;
+    }
+
+    let price = 100;
+    price += selectedTower.upgradesSoFar * 2 * 25;
+    if (player.money >= price){
+        player.changeMoneyBy(-price);
+        selectedTower.upgradesSoFar++;
+        selectedTower.rateOfFire += 0.5;
+        towerUpgradeSound.play();
+    }
+    else{
+        errorSound.play();
+    }
 }
